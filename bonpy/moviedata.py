@@ -31,21 +31,46 @@ class OpenCVMovieData(MovieData):
 
         ret, frame = cap.read()
 
+        atol = 10
         metadata = dict(width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                         height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
                         dtype=frame.dtype,
-                        bw=np.allclose(frame[:, :, 0], frame[:, :, 1]) and np.allclose(frame[:, :, 0], frame[:, :, 2]),
+                        bw=np.allclose(frame[:, :, 0], frame[:, :, 1], atol=atol) and 
+                            np.allclose(frame[:, :, 0], frame[:, :, 2], atol=atol),
                         n_frames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
     
         cap.release()
 
         return metadata
 
+    @property
+    def n_dims(self):
+        return len(self.shape)
+
+    @property
+    def is_bw(self):
+        return self.metadata["bw"]
+    @property
+    def shape(self):
+        shape = (self.metadata["n_frames"], self.metadata["height"], self.metadata["width"],)
+
+        if not self.is_bw:
+            shape += (3,)
+
+        return shape
+
+    @property
+    def dtype(self):
+        return self.metadata["dtype"]
+
     def __getitem__(self, idx):
+        # On my machine, a single frame of size (634, 548) takes approx. 0.015 seconds to retrieve; 
+        # 100 frames take approx. 0.25 seconds to retrieve (2.3 ms/frame + 15 ms overhead).
+
         if isinstance(idx, tuple):
             # Extract individual indexes for frames, rows, and columns
             channel_idx = slice(None)
-            if self.metadata["bw"]:
+            if self.is_bw:
                 assert len(idx) == 3
                 frame_idx, row_idx, col_idx = idx
             else:
@@ -66,17 +91,22 @@ class OpenCVMovieData(MovieData):
         return self._retrieve_and_slice_frames(frame_idx, row_idx, col_idx, channel_idx)
 
     def _retrieve_and_slice_frames(self, frame_idx, row_idx, col_idx, channel_idx=None):
-
         # Open the video file
         cap = cv2.VideoCapture(self.source_filename)
-
+        squeeze_n_frames = False
         # Test if frame index is iterable:
         try:
             iter(frame_idx)
+            is_iterable = True
+        except TypeError:
+            is_iterable = False
+
+        if is_iterable:
             frame_idx = np.array(frame_idx)
             # If so, check if boolean or integer values, If boolean, test if length matches number of frames,
             # and generate array with integer valid values:
-            assert frame_idx.dtype in [bool, int]
+            print(frame_idx, frame_idx.dtype)
+            assert frame_idx.dtype in [bool, int, np.int32, np.int64]
 
             if frame_idx.dtype == bool:
                 if len(frame_idx) != self.length:
@@ -89,20 +119,36 @@ class OpenCVMovieData(MovieData):
                     raise ValueError("Integer frame indices must be between 0 and number of frames.")
                 # Convert negative indices to positive, conting from the end:
                 frame_idx[frame_idx < 0] += self.metadata["n_frames"]
-            
+                            
             frame_indices = frame_idx
         
-        except TypeError:
+        else:
             # Determine frame indices
-            if isinstance(frame_idx, int):
+            if isinstance(frame_idx, int) or isinstance(frame_idx, np.int32) or isinstance(frame_idx, np.int64):
                 frame_indices = [frame_idx]
+                squeeze_n_frames = True
             elif isinstance(frame_idx, slice):
                 frame_indices = range(*frame_idx.indices(self.metadata["n_frames"]))
+            
             else:
                 raise TypeError("Frame index must be an interable, an integer or a slice.")
 
-        frames = []
-        for idx in frame_indices:
+        # Compute the size of the retrieved frames:
+        new_frames = len(frame_indices)
+        new_height = len(range(*row_idx.indices(self.metadata["height"])))
+        new_width = len(range(*col_idx.indices(self.metadata["width"])))
+        new_channels = len(range(*channel_idx.indices(3))) if channel_idx is not None else None
+
+        output_data_shape = (new_frames, new_height, new_width)
+        if not self.is_bw:
+            output_data_shape += (new_channels,)
+
+        frames_data = np.zeros(output_data_shape, dtype=self.dtype)
+
+        # Show bar only if verbose and more than 400 frames: 
+        wrapper = tqdm if self.verbose and new_frames > 400 else lambda x: x
+        
+        for n_idx, idx in enumerate(wrapper(frame_indices)):
             cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
             ret, frame = cap.read()
             if ret:
@@ -111,21 +157,24 @@ class OpenCVMovieData(MovieData):
                     sliced_frame = frame[row_idx, col_idx, channel_idx]
                 else:
                     sliced_frame = frame[row_idx, col_idx]
-                if sliced_frame.ndim == 3 and self.metadata["bw"]:
+                if sliced_frame.ndim == 3 and self.is_bw:
                     sliced_frame = sliced_frame[:, :, 0]
-                frames.append(sliced_frame)
+                frames_data[n_idx, ...] = sliced_frame
             else:
                 break
 
         cap.release()
+        
+        if squeeze_n_frames:
+            frames_data = np.squeeze(frames_data, axis=0)
 
-        return np.array(frames)
+        return frames_data  # np.array(frames)
 
 
     
 
 if __name__ == "__main__":
-    path = "/Users/vigji/Desktop/headfixed/M13/20231110/135615/eye-cam_video_2023-11-10T13_56_15.avi"
+    path = "/Users/vigji/Desktop/headfixed/M13/20231110/135615/top-cam_video_2023-11-10T13_56_15.avi"
 
     m = OpenCVMovieData(path)
     print("getting meta")
@@ -137,3 +186,15 @@ if __name__ == "__main__":
     print(m[[1,2,3]].shape)
 
     print(m[:10, 10:-20, 30:-30].shape)
+
+    # time single frame retrieval on 100 test frames:
+    import time
+    
+    import napari
+
+    # with napari.gui_qt():
+    v = napari.Viewer()
+    v.add_image(m, name="test", contrast_limits=(0, 255), multiscale=False)
+    napari.run()
+    
+    # v.show()

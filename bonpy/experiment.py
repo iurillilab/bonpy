@@ -32,7 +32,13 @@ class Experiment:
                                            exp_id=exp_id)
         
     def _discover_files(self):
-        file_pattern = 
+        CATEGORIES_TO_DISCOVER = ["csv", "avi"]
+
+        for extension in CATEGORIES_TO_DISCOVER:
+            for file in self.root_path.glob(f"*.{extension}"):
+                self.files_dict[file.stem] = file
+
+
 
     ### Code for experiments before 11/2023
     # def _discover_files(self):
