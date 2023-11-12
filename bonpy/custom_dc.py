@@ -4,5 +4,5 @@ from datetime import datetime
 @dataclass
 class ExperimentMetadata:
     timestamp: datetime
-    mouse_id: str
+    animal_id: str
     exp_id: str
