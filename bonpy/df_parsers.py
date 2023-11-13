@@ -3,6 +3,7 @@ from dateutil.parser import parse
 
 BALL_SMOOOTH_WND = 200
 
+
 def time_cols_fix(df, t0=None):
     # TODO to substitute with some form of datetime.strptime(df["timestamp"][0], "%Y-%m-%dT%H:%M:%S")
     df["timestamp"] = df["timestamp"].apply(parse)
@@ -36,7 +37,9 @@ def parse_ball_log(file, t0=None, smooth_wnd=None):
     df[data_cols] -= 127  # set actual origin (original number is uint8)
 
     if smooth_wnd is not None:
-        df.loc[:, data_cols] = df.loc[:, data_cols].rolling(smooth_wnd, center=True).median()
+        df.loc[:, data_cols] = (
+            df.loc[:, data_cols].rolling(smooth_wnd, center=True).median()
+        )
 
     return df
 
@@ -47,6 +50,3 @@ def parse_stim_log(file, t0=None):
     df.reset_index(drop=True, inplace=True)
     time_cols_fix(df, t0=t0)
     return df
-
-
-

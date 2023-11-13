@@ -1,57 +1,72 @@
-from datetime import datetime
-from bonpy.df_parsers import parse_ball_log, parse_stim_log
-from bonpy.custom_dc import ExperimentMetadata
-from bonpy.moviedata import OpenCVMovieData
-import pytz
 import re
-import pandas as pd
-from pathlib import Path
 from collections import UserDict
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+import pytz
+
+from bonpy.custom_dc import ExperimentMetadata
+from bonpy.df_parsers import parse_ball_log, parse_stim_log
+from bonpy.moviedata import OpenCVMovieData
 
 FILETSTAMP_LENGTH = 19  # length of the file timestamp
 FILETSTAMP_PARSER = "%Y-%m-%dT%H_%M_%S"  # pattern of the file timestamp
 KEY_PATTERN = "log"  # pattern in the file that identify the key string
 TIMEZONE = "Europe/Rome"
 
-PARSERS_DICT = dict(ball_log=parse_ball_log, stim_log=parse_stim_log, laser_log=parse_stim_log)
+PARSERS_DICT = dict(
+    ball_log=parse_ball_log, stim_log=parse_stim_log, laser_log=parse_stim_log
+)
+
 
 # Heuristic to identify the timestamp column
 def _is_timestamp_column(values):
-    timestamp_regex = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+[\+\-]\d{2}:\d{2}'
+    """Identify the timestamp column in a dataframe."""
+    timestamp_regex = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+[\+\-]\d{2}:\d{2}"
     return all(re.match(timestamp_regex, str(x)) for x in values)
 
 
 def _load_csv(filename, timestamp_begin=None):
+    """Load a csv file and parse the timestamp column."""
     df = pd.read_csv(filename)
-    timestamp_col = df.head().apply(_is_timestamp_column)  # [_is_timestamp_column(df.columns)]
+    timestamp_col = df.head().apply(
+        _is_timestamp_column
+    )  # [_is_timestamp_column(df.columns)]
     timestamp_cols = timestamp_col[timestamp_col].index
     assert len(timestamp_cols) == 1, "Multiple timestamp columns found"
 
+    # Parse timestamp column:
     df[timestamp_cols[0]] = pd.to_datetime(df[timestamp_cols[0]])
+
+    # Compute time offset:
     if timestamp_begin is None:
-        time_offset = df[timestamp_cols[0]][0]  
+        time_offset = df[timestamp_cols[0]][0]
     else:
-        pd.to_datetime(timestamp_begin).tz_localize(pytz.timezone(TIMEZONE))
+        time_offset = pd.to_datetime(timestamp_begin).tz_localize(
+            pytz.timezone(TIMEZONE)
+        )
 
     df["time"] = (df[timestamp_cols[0]] - time_offset).dt.total_seconds()
 
     return df
+    b
 
 
 def _load_avi(filename):
     return OpenCVMovieData(filename)
 
 
-loaders_dict = dict(csv=_load_csv, avi=_load_avi)
+# Dictionary defining loading functions for different file types:
+LOADERS_DICT = dict(csv=_load_csv, avi=_load_avi)
 
 
 class LazyDict(UserDict):
-    # Used to lazily load multiple file types lazily based on some default loaders
+    """Dictionary that loads data on demand using a dictionary of loaders."""
 
-    def __init__(self, files_dict, loaders_dict=loaders_dict, timestamp_begin=None):
-
+    def __init__(self, files_dict, loaders_dict=LOADERS_DICT, timestamp_begin=None):
         self.files_dict = files_dict
-        self.loaders_dict = loaders_dict
+        self.loaders_dict = LOADERS_DICT
         self.timestamp_begin = timestamp_begin
 
         super().__init__()
@@ -69,9 +84,7 @@ class LazyDict(UserDict):
 
 
 class Experiment:
-    def __init__(self, root_path, session_id, 
-                 timestamp, animal_id, paradigm_id):
-
+    def __init__(self, root_path, session_id, timestamp, animal_id, paradigm_id):
         self.root_path = root_path
         # self.session_id = session_id
 
@@ -80,24 +93,41 @@ class Experiment:
 
         self.data_dict = LazyDict(self.files_dict, timestamp_begin=timestamp)
 
-        self.metadata = ExperimentMetadata(timestamp=timestamp,
-                                           session_id=session_id,
-                                           animal_id=animal_id,
-                                           paradigm_id=paradigm_id)
-        
-    def _discover_files(self):
-        CATEGORIES_TO_DISCOVER = ["csv", "avi"]
+        self.metadata = ExperimentMetadata(
+            timestamp=timestamp,
+            session_id=session_id,
+            animal_id=animal_id,
+            paradigm_id=paradigm_id,
+        )
 
-        for extension in CATEGORIES_TO_DISCOVER:
+    def _discover_files(self):
+        categories_to_discover = LOADERS_DICT.keys()
+
+        for extension in categories_to_discover:
             for file in self.root_path.glob(f"*.{extension}"):
                 # split over beginning of timestamp:
                 name = file.stem
                 if "20" in file.stem:
                     name = name.split("_20")[0]
-                
+
                 self.files_dict[name] = file
 
+    @classmethod
+    def load_112023(cls, folder_path, exp_id=None):
+        folder_path = Path(folder_path)
+        time = folder_path.name
+        date = folder_path.parent.name
 
+        animal_id = folder_path.parent.parent.name
+        exp_id = exp_id if exp_id is not None else folder_path.parent.parent.parent.name
+
+        return cls(
+            root_path=folder_path,
+            animal_id=animal_id,
+            paradigm_id=exp_id,
+            session_id=date + "/" + time,
+            timestamp=datetime.strptime(date + time, "%Y%m%d%H%M%S"),
+        )
 
     ### Code for experiments before 11/2023
     # def _discover_files(self):
@@ -134,27 +164,6 @@ class Experiment:
     #         load_func = PARSERS_DICT[key]
     #         print(filename)
     #         setattr(self, key, load_func(filename))
-
-    @classmethod
-    def load_112023(cls, folder_path, exp_id=None):
-        folder_path = Path(folder_path)
-        time = folder_path.name
-        date = folder_path.parent.name
-
-        animal_id = folder_path.parent.parent.name
-        exp_id = exp_id if exp_id is not None else folder_path.parent.parent.parent.name
-
-
-
-        return cls(root_path=folder_path,
-                   animal_id=animal_id, 
-                   paradigm_id=exp_id, 
-                   session_id=date + "/" + time, 
-                   timestamp=datetime.strptime(date + time, '%Y%m%d%H%M%S')
-                   )
-
-    #@staticmethod
-    #def _
 
 
 if __name__ == "__main__":
