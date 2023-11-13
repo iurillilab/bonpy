@@ -5,4 +5,5 @@ from datetime import datetime
 class ExperimentMetadata:
     timestamp: datetime
     animal_id: str
-    exp_id: str
+    session_id: str
+    paradigm_id: str
