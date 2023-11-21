@@ -34,23 +34,25 @@ def _load_csv(filename, timestamp_begin=None):
         _is_timestamp_column
     )  # [_is_timestamp_column(df.columns)]
     timestamp_cols = timestamp_col[timestamp_col].index
-    assert len(timestamp_cols) == 1, "Multiple timestamp columns found"
 
-    # Parse timestamp column:
-    df[timestamp_cols[0]] = pd.to_datetime(df[timestamp_cols[0]])
+    # Check that only one timestamp column is found, in which case is a legitimate 
+    # timestamped dataframe;
+    if len(timestamp_cols) == 1:
+        # In which case:
+        # Parse timestamp column:
+        df[timestamp_cols[0]] = pd.to_datetime(df[timestamp_cols[0]])
 
-    # Compute time offset:
-    if timestamp_begin is None:
-        time_offset = df[timestamp_cols[0]][0]
-    else:
-        time_offset = pd.to_datetime(timestamp_begin).tz_localize(
-            pytz.timezone(TIMEZONE)
-        )
+        # Compute time offset:
+        if timestamp_begin is None:
+            time_offset = df[timestamp_cols[0]][0]
+        else:
+            time_offset = pd.to_datetime(timestamp_begin).tz_localize(
+                pytz.timezone(TIMEZONE)
+            )
 
-    df["time"] = (df[timestamp_cols[0]] - time_offset).dt.total_seconds()
+        df["time"] = (df[timestamp_cols[0]] - time_offset).dt.total_seconds()
 
     return df
-    b
 
 
 def _load_avi(filename):
@@ -73,6 +75,23 @@ class LazyDict(UserDict):
 
     def keys(self):
         return self.files_dict.keys()
+    
+    def __repr__(self) -> str:
+        output = ""
+        line_template = "{:<25} {:<13} {:<13} {:<13}\n"
+        output += line_template.format("Filename", "Extension", "Has reader", "Loaded")
+        for filename, path in self.files_dict.items():
+            output += line_template.format(filename, 
+                                           path.suffix, 
+                                           ["No", "Yes"][int(path.suffix[1:] in LOADERS_DICT)],
+                                           ["No", "Yes"][int(filename in self.data)],
+            )
+
+        return output
+        # return f"Lazy data dict with keys: {list(self.files_dict.keys())}"
+    
+    def __str__(self) -> str:
+        return self.__repr__()
 
     def __getitem__(self, key):
         file = self.files_dict[key]
@@ -167,10 +186,18 @@ class Experiment:
 
 
 if __name__ == "__main__":
-    path = "/Users/vigji/Desktop/headfixed/M13/20231110/135615"
+    path = "/Users/vigji/Desktop/eye-response/M13/20231115/145913"
 
-    exp = Experiment.load_112023(path)
-    print(exp.metadata.timestamp)
-    # print(exp.files_dict.keys())
-    print(exp.data_dict["ball-log"].head())
-    print(exp.data_dict.keys())
+    import numpy as np
+    import pandas as pd
+    from pathlib import Path
+    from bonpy.experiment import Experiment
+
+    main_path = Path("/Users/vigji/Desktop/eye-response")
+
+    all_tracked = list(main_path.glob("M*/*/*/tracked*eye*.csv"))
+
+    filtered = [f.parent for f in all_tracked if len(pd.read_csv(f)) > 50000]
+
+    exp = Experiment.load_112023(filtered[0])
+    exp.data_dict["tracked_eye-cam_video"]
