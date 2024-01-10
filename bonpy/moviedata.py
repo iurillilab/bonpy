@@ -36,11 +36,20 @@ class MovieData(ABC):
 
     """
 
-    def __init__(self, source_filename) -> None:
-        assert Path(source_filename).exists()
-
-        self.source_filename = str(source_filename)
+    def __init__(self, source_filename, t0=None) -> None:
+        source_filename = Path(source_filename)
         
+        assert source_filename.exists()
+
+        # Check if a timestamp file is present.
+        # The convention is that timestamp file is named the same as the movie file,
+        # with timestamp instead of movie and .csv extension
+        self.timestamp_file = source_filename.parent / source_filename.name.replace("video", "timestamps")
+        
+        # Check if there is a DLC file available:
+        
+
+        self.source_filename = source_filename
         self.verbose = True
 
     # @abstractclassmethod
@@ -50,6 +59,13 @@ class MovieData(ABC):
     @abstractproperty
     def metadata(self) -> MovieMetadata:
         pass
+
+    @property
+    def has_timestamps(self) -> bool:
+        return self.timestamp_file.exists()
+    
+    @property
+
 
     @property
     def dtype(self) -> np.dtype:
@@ -115,7 +131,7 @@ class OpenCVMovieData(MovieData):
 
     def __init__(self, source_filename, verbose=True) -> None:
         super().__init__(source_filename)
-        
+
         self.verbose = verbose
 
     @cached_property
@@ -240,11 +256,10 @@ class OpenCVMovieData(MovieData):
             frames_data = np.squeeze(frames_data, axis=0)
 
         return frames_data
-    
 
-class DLCTrackedMovieData():
+
+class DLCTrackedMovieData:
     pass
-
 
 
 if __name__ == "__main__":
@@ -262,8 +277,8 @@ if __name__ == "__main__":
     print(m[:10, 10:-20, 30:-30].shape)
 
     # time single frame retrieval on 100 test frames:
-    #import napari
+    # import napari
 
-    #v = napari.Viewer()
-    #v.add_image(m, name="test", contrast_limits=(0, 255), multiscale=False)
-    #napari.run()
+    # v = napari.Viewer()
+    # v.add_image(m, name="test", contrast_limits=(0, 255), multiscale=False)
+    # napari.run()

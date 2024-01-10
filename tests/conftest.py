@@ -17,4 +17,3 @@ def asset_moviedata_file(asset_moviedata_folder):
     #     return str(filename)
     # else:
     #     return filename
-    
