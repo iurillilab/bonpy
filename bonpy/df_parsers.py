@@ -50,3 +50,11 @@ def parse_stim_log(file, t0=None):
     df.reset_index(drop=True, inplace=True)
     time_cols_fix(df, t0=t0)
     return df
+
+
+def parse_dlc_tracking(file, t0=None):
+    df = pd.read_hdf(file)
+    # remove first level of columns multiindex:
+    df.columns = df.columns.droplevel(0)  
+
+    return df  

@@ -1,12 +1,39 @@
 from abc import ABC, abstractmethod, abstractproperty
 from functools import cached_property
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
 from tqdm import tqdm
 
+@dataclass
+class MovieMetadata:
+    width: int
+    height: int
+    n_frames: int
+    dtype: np.dtype
+    bw: bool 
+
 
 class MovieData(ABC):
+    """Interface for movie data. Subclasses can implement different readers backends,
+    the class offer a numpy-like interface for accessing frames.
+
+    Args:
+        source_filename (str): Path to the movie file.
+
+    Properties:
+        metadata (MovieMetadata): Metadata of the movie.
+        dtype (np.dtype): Data type of the movie.
+        n_dims (int): Number of dimensions of the movie.
+        is_bw (bool): Whether the movie is black and white.
+        shape (tuple): Shape of the movie.
+
+    Methods:
+        __getitem__(idx): Returns a slice of the movie.
+
+    """
+
     def __init__(self, source_filename) -> None:
         self.source_filename = str(source_filename)
         self.verbose = True
@@ -16,50 +43,27 @@ class MovieData(ABC):
     #    pass
 
     @abstractproperty
-    def metadata(self):
+    def metadata(self) -> MovieMetadata:
         pass
 
-
-class OpenCVMovieData(MovieData):
-    def __init__(self, source_filename, verbose=True) -> None:
-        super().__init__(source_filename)
-
-        self.verbose = verbose
-
-    @cached_property
-    def metadata(self):
-        cap = cv2.VideoCapture(self.source_filename)
-
-        ret, frame = cap.read()
-
-        atol = 10
-        metadata = dict(
-            width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-            dtype=frame.dtype,
-            bw=np.allclose(frame[:, :, 0], frame[:, :, 1], atol=atol)
-            and np.allclose(frame[:, :, 0], frame[:, :, 2], atol=atol),
-            n_frames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
-        )
-
-        cap.release()
-
-        return metadata
+    @property
+    def dtype(self) -> np.dtype:
+        return self.metadata.dtype
 
     @property
-    def n_dims(self):
+    def n_dims(self) -> int:
         return len(self.shape)
 
     @property
-    def is_bw(self):
-        return self.metadata["bw"]
+    def is_bw(self) -> bool:
+        return self.metadata.bw
 
     @property
-    def shape(self):
+    def shape(self) -> tuple:
         shape = (
-            self.metadata["n_frames"],
-            self.metadata["height"],
-            self.metadata["width"],
+            self.metadata.n_frames,
+            self.metadata.height,
+            self.metadata.width,
         )
 
         if not self.is_bw:
@@ -67,13 +71,7 @@ class OpenCVMovieData(MovieData):
 
         return shape
 
-    @property
-    def dtype(self):
-        return self.metadata["dtype"]
-
     def __getitem__(self, idx):
-        # On my machine, a single frame of size (634, 548) takes approx. 0.015 seconds to retrieve;
-        # 100 frames take approx. 0.25 seconds to retrieve (2.3 ms/frame + 15 ms overhead).
 
         if isinstance(idx, tuple):
             # Extract individual indexes for frames, rows, and columns
@@ -98,7 +96,51 @@ class OpenCVMovieData(MovieData):
         # Retrieve and slice frames
         return self._retrieve_and_slice_frames(frame_idx, row_idx, col_idx, channel_idx)
 
+    @abstractmethod
+    def _retrieve_and_slice_frames(self, frame_idx, row_idx, col_idx, channel_idx):
+        pass
+
+
+class OpenCVMovieData(MovieData):
+    """Movie data class using OpenCV as backend.
+    """
+
+    VERBOSE_DEFAULT_NFRAMES = 400  # Number of frames above which to show progress bar
+    BW_DEFAULT_ATOL = 10  # Absolute tolerance of similarity across channels for BW detection
+
+    def __init__(self, source_filename, verbose=True) -> None:
+        super().__init__(source_filename)
+
+        self.verbose = verbose
+
+    @cached_property
+    def metadata(self):
+
+        # We need to read frames independently from _retrieve_and_slice_frames to 
+        # avoid circularity and read the metadata:
+        cap = cv2.VideoCapture(self.source_filename)
+        ret, frame = cap.read()
+
+        # bw if all frames very similar across channels:
+        bw = np.allclose(frame[:, :, 0], frame[:, :, 1], atol=self.BW_DEFAULT_ATOL) \
+                         and np.allclose(frame[:, :, 0], frame[:, :, 2], atol=self.BW_DEFAULT_ATOL)
+
+        metadata = MovieMetadata(
+            width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+            height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+            dtype=frame.dtype,
+            bw=bw,
+            n_frames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+        )
+
+        cap.release()
+
+        return metadata
+
     def _retrieve_and_slice_frames(self, frame_idx, row_idx, col_idx, channel_idx=None):
+        # On my machine, a single frame of size (634, 548) takes approx. 0.015 seconds to retrieve;
+        # 100 frames take approx. 0.25 seconds to retrieve (2.3 ms/frame + 15 ms overhead).
+
         # Open the video file
         cap = cv2.VideoCapture(self.source_filename)
         squeeze_n_frames = False
@@ -113,7 +155,7 @@ class OpenCVMovieData(MovieData):
             frame_idx = np.array(frame_idx)
             # If so, check if boolean or integer values, If boolean, test if length matches number of frames,
             # and generate array with integer valid values:
-            print(frame_idx, frame_idx.dtype)
+            # print(frame_idx, frame_idx.dtype)
             assert frame_idx.dtype in [bool, int, np.int32, np.int64]
 
             if frame_idx.dtype == bool:
@@ -125,12 +167,12 @@ class OpenCVMovieData(MovieData):
 
             elif frame_idx.dtype == int:
                 # check if values are valid
-                if np.any(np.array(frame_idx) >= self.metadata["n_frames"]):
+                if np.any(np.array(frame_idx) >= self.metadata.n_frames):
                     raise ValueError(
                         "Integer frame indices must be between 0 and number of frames."
                     )
                 # Convert negative indices to positive, conting from the end:
-                frame_idx[frame_idx < 0] += self.metadata["n_frames"]
+                frame_idx[frame_idx < 0] += self.metadata.n_frames
 
             frame_indices = frame_idx
 
@@ -144,7 +186,7 @@ class OpenCVMovieData(MovieData):
                 frame_indices = [frame_idx]
                 squeeze_n_frames = True
             elif isinstance(frame_idx, slice):
-                frame_indices = range(*frame_idx.indices(self.metadata["n_frames"]))
+                frame_indices = range(*frame_idx.indices(self.metadata.n_frames))
 
             else:
                 raise TypeError(
@@ -153,8 +195,8 @@ class OpenCVMovieData(MovieData):
 
         # Compute the size of the retrieved frames:
         new_frames = len(frame_indices)
-        new_height = len(range(*row_idx.indices(self.metadata["height"])))
-        new_width = len(range(*col_idx.indices(self.metadata["width"])))
+        new_height = len(range(*row_idx.indices(self.metadata.height)))
+        new_width = len(range(*col_idx.indices(self.metadata.width)))
         new_channels = (
             len(range(*channel_idx.indices(3))) if channel_idx is not None else None
         )
@@ -165,8 +207,8 @@ class OpenCVMovieData(MovieData):
 
         frames_data = np.zeros(output_data_shape, dtype=self.dtype)
 
-        # Show bar only if verbose and more than 400 frames:
-        wrapper = tqdm if self.verbose and new_frames > 400 else lambda x: x
+        # Show bar only if verbose and more than VERBOSE_DEFAULT_NFRAMES frames:
+        wrapper = tqdm if self.verbose and new_frames > self.VERBOSE_DEFAULT_NFRAMES else lambda x: x
 
         for n_idx, idx in enumerate(wrapper(frame_indices)):
             cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
@@ -188,7 +230,7 @@ class OpenCVMovieData(MovieData):
         if squeeze_n_frames:
             frames_data = np.squeeze(frames_data, axis=0)
 
-        return frames_data  # np.array(frames)
+        return frames_data
 
 
 if __name__ == "__main__":
