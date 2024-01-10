@@ -2,11 +2,13 @@ from abc import ABC, abstractmethod, abstractproperty
 from functools import cached_property
 from dataclasses import dataclass
 from pathlib import Path
+import pandas as pd
 
 import cv2
 import numpy as np
 from tqdm import tqdm
 
+from bonpy.time_utils import inplace_time_cols_fix
 
 @dataclass
 class MovieMetadata:
@@ -36,7 +38,7 @@ class MovieData(ABC):
 
     """
 
-    def __init__(self, source_filename, t0=None) -> None:
+    def __init__(self, source_filename, timestamp_begin=None) -> None:
         source_filename = Path(source_filename)
         
         assert source_filename.exists()
@@ -44,12 +46,16 @@ class MovieData(ABC):
         # Check if a timestamp file is present.
         # The convention is that timestamp file is named the same as the movie file,
         # with timestamp instead of movie and .csv extension
-        self.timestamp_file = source_filename.parent / source_filename.name.replace("video", "timestamps")
+        self.timestamp_filename = source_filename.parent / source_filename.name.replace("video", "timestamps")
         
         # Check if there is a DLC file available:
-        
+        # try:
+        #     self.dlc_filename = next(source_filename.parent.glob(f"{source_filename.name}*DLC*.h5"))
+        # except StopIteration:
+        #     self.dlc_filename = None
 
         self.source_filename = source_filename
+        self.timestamp_begin = timestamp_begin
         self.verbose = True
 
     # @abstractclassmethod
@@ -62,10 +68,21 @@ class MovieData(ABC):
 
     @property
     def has_timestamps(self) -> bool:
-        return self.timestamp_file.exists()
+        return self.timestamp_filename.exists()
     
     @property
+    def has_dlc(self) -> bool:
+        return self.dlc_filename.exists()
+    
+    @cached_property
+    def timestamps(self) -> np.ndarray:
+        if self.has_timestamps:
+            timestamps_df = pd.read_csv(self.timestamp_filename)
+            inplace_time_cols_fix(timestamps_df, timestamp_begin=self.timestamp_begin)
 
+            return timestamps_df
+        else:
+            return None
 
     @property
     def dtype(self) -> np.dtype:
@@ -138,7 +155,7 @@ class OpenCVMovieData(MovieData):
     def metadata(self):
         # We need to read frames independently from _retrieve_and_slice_frames to
         # avoid circularity and read the metadata:
-        cap = cv2.VideoCapture(self.source_filename)
+        cap = cv2.VideoCapture(str(self.source_filename))
         ret, frame = cap.read()
 
         # bw if all frames very similar across channels:
@@ -163,7 +180,7 @@ class OpenCVMovieData(MovieData):
         # 100 frames take approx. 0.25 seconds to retrieve (2.3 ms/frame + 15 ms overhead).
 
         # Open the video file
-        cap = cv2.VideoCapture(self.source_filename)
+        cap = cv2.VideoCapture(str(self.source_filename))
         squeeze_n_frames = False
         # Test if frame index is iterable:
         try:

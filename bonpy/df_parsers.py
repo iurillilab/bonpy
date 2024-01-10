@@ -1,19 +1,8 @@
 import pandas as pd
-from dateutil.parser import parse
+
+from bonpy.time_utils import inplace_time_cols_fix
 
 BALL_SMOOOTH_WND = 200
-
-
-def time_cols_fix(df, t0=None):
-    # TODO to substitute with some form of datetime.strptime(df["timestamp"][0], "%Y-%m-%dT%H:%M:%S")
-    df["timestamp"] = df["timestamp"].apply(parse)
-
-    if t0 is None:
-        t0 = df["timestamp"][0]
-
-    df["timedelta"] = df["timestamp"] - t0  # .dt.total_seconds()
-    df["time"] = df["timedelta"].dt.total_seconds()
-    df.drop(["timestamp"], axis=1, inplace=True)
 
 
 def parse_ball_log(file, t0=None, smooth_wnd=None):
@@ -29,7 +18,7 @@ def parse_ball_log(file, t0=None, smooth_wnd=None):
     df.columns = columns
     df = df[1:].reset_index()
 
-    time_cols_fix(df)
+    inplace_time_cols_fix(df)
     data_cols = [c for c in df.columns if "time" not in c and "servo_pos" not in c]
 
     for c in data_cols:
@@ -48,7 +37,7 @@ def parse_stim_log(file, t0=None):
     df = pd.read_csv(file)
     df.columns = ["laser", "timestamp"]
     df.reset_index(drop=True, inplace=True)
-    time_cols_fix(df, t0=t0)
+    inplace_time_cols_fix(df, t0=t0)
     return df
 
 
@@ -56,5 +45,15 @@ def parse_dlc_tracking(file, t0=None):
     df = pd.read_hdf(file)
     # remove first level of columns multiindex:
     df.columns = df.columns.droplevel(0)
+
+    # Check if there are timestamps for the video:
+    candidate_timestamps_name = file.parent / file.name.split("DLC")[0].replace("video", "timestamps")
+
+    if candidate_timestamps_name.exists():
+        timestamps_df = pd.read_csv(candidate_timestamps_name)
+        inplace_time_cols_fix(timestamps_df)
+        assert timestamps_df.shape[0] == df.shape[0], "Timestamps and DLC dataframes have different lengths!"
+        
+        df["time"] = timestamps_df["time"]
 
     return df
