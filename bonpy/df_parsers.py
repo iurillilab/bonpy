@@ -55,6 +55,6 @@ def parse_stim_log(file, t0=None):
 def parse_dlc_tracking(file, t0=None):
     df = pd.read_hdf(file)
     # remove first level of columns multiindex:
-    df.columns = df.columns.droplevel(0)  
+    df.columns = df.columns.droplevel(0)
 
-    return df  
+    return df

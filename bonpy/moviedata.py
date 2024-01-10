@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod, abstractproperty
 from functools import cached_property
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
 from tqdm import tqdm
+
 
 @dataclass
 class MovieMetadata:
@@ -12,7 +14,7 @@ class MovieMetadata:
     height: int
     n_frames: int
     dtype: np.dtype
-    bw: bool 
+    bw: bool
 
 
 class MovieData(ABC):
@@ -35,7 +37,10 @@ class MovieData(ABC):
     """
 
     def __init__(self, source_filename) -> None:
+        assert Path(source_filename).exists()
+
         self.source_filename = str(source_filename)
+        
         self.verbose = True
 
     # @abstractclassmethod
@@ -72,7 +77,6 @@ class MovieData(ABC):
         return shape
 
     def __getitem__(self, idx):
-
         if isinstance(idx, tuple):
             # Extract individual indexes for frames, rows, and columns
             channel_idx = slice(None)
@@ -102,28 +106,29 @@ class MovieData(ABC):
 
 
 class OpenCVMovieData(MovieData):
-    """Movie data class using OpenCV as backend.
-    """
+    """Movie data class using OpenCV as backend."""
 
     VERBOSE_DEFAULT_NFRAMES = 400  # Number of frames above which to show progress bar
-    BW_DEFAULT_ATOL = 10  # Absolute tolerance of similarity across channels for BW detection
+    BW_DEFAULT_ATOL = (
+        10  # Absolute tolerance of similarity across channels for BW detection
+    )
 
     def __init__(self, source_filename, verbose=True) -> None:
         super().__init__(source_filename)
-
+        
         self.verbose = verbose
 
     @cached_property
     def metadata(self):
-
-        # We need to read frames independently from _retrieve_and_slice_frames to 
+        # We need to read frames independently from _retrieve_and_slice_frames to
         # avoid circularity and read the metadata:
         cap = cv2.VideoCapture(self.source_filename)
         ret, frame = cap.read()
 
         # bw if all frames very similar across channels:
-        bw = np.allclose(frame[:, :, 0], frame[:, :, 1], atol=self.BW_DEFAULT_ATOL) \
-                         and np.allclose(frame[:, :, 0], frame[:, :, 2], atol=self.BW_DEFAULT_ATOL)
+        bw = np.allclose(
+            frame[:, :, 0], frame[:, :, 1], atol=self.BW_DEFAULT_ATOL
+        ) and np.allclose(frame[:, :, 0], frame[:, :, 2], atol=self.BW_DEFAULT_ATOL)
 
         metadata = MovieMetadata(
             width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
@@ -208,7 +213,11 @@ class OpenCVMovieData(MovieData):
         frames_data = np.zeros(output_data_shape, dtype=self.dtype)
 
         # Show bar only if verbose and more than VERBOSE_DEFAULT_NFRAMES frames:
-        wrapper = tqdm if self.verbose and new_frames > self.VERBOSE_DEFAULT_NFRAMES else lambda x: x
+        wrapper = (
+            tqdm
+            if self.verbose and new_frames > self.VERBOSE_DEFAULT_NFRAMES
+            else lambda x: x
+        )
 
         for n_idx, idx in enumerate(wrapper(frame_indices)):
             cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
@@ -231,6 +240,11 @@ class OpenCVMovieData(MovieData):
             frames_data = np.squeeze(frames_data, axis=0)
 
         return frames_data
+    
+
+class DLCTrackedMovieData():
+    pass
+
 
 
 if __name__ == "__main__":
@@ -248,13 +262,8 @@ if __name__ == "__main__":
     print(m[:10, 10:-20, 30:-30].shape)
 
     # time single frame retrieval on 100 test frames:
-    import time
+    #import napari
 
-    import napari
-
-    # with napari.gui_qt():
-    v = napari.Viewer()
-    v.add_image(m, name="test", contrast_limits=(0, 255), multiscale=False)
-    napari.run()
-
-    # v.show()
+    #v = napari.Viewer()
+    #v.add_image(m, name="test", contrast_limits=(0, 255), multiscale=False)
+    #napari.run()

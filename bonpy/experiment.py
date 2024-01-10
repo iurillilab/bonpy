@@ -29,7 +29,7 @@ class Experiment:
     @cached_property
     def size(self):
         total_size = 0
-        for file in self.root_path.rglob('*'):
+        for file in self.root_path.rglob("*"):
             if file.is_file():
                 total_size += os.path.getsize(file)
         return total_size / 1e9
@@ -50,7 +50,7 @@ class Experiment:
             session_id=date + "/" + time,
             timestamp=datetime.strptime(date + time, "%Y%m%d%H%M%S"),
         )
-    
+
     def __repr__(self) -> str:
         return f"Experiment {self.metadata.paradigm_id} on animal: {self.metadata.animal_id} ({self.metadata.timestamp})"
 
@@ -93,11 +93,6 @@ class Experiment:
 
 if __name__ == "__main__":
     path = "/Users/vigji/Desktop/eye-response/M13/20231115/145913"
-
-    import numpy as np
-    import pandas as pd
-    from pathlib import Path
-    from bonpy.experiment import Experiment
 
     main_path = Path("/Users/vigji/Desktop/eye-response")
 

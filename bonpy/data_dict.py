@@ -15,8 +15,8 @@ KEY_PATTERN = "log"  # pattern in the file that identify the key string
 TIMEZONE = "Europe/Rome"
 
 # PARSERS_DICT = dict(
-#     ball_log=parse_ball_log, 
-#     stim_log=parse_stim_log, 
+#     ball_log=parse_ball_log,
+#     stim_log=parse_stim_log,
 #     laser_log=parse_stim_log,
 # )
 
@@ -36,7 +36,7 @@ def _load_csv(filename, timestamp_begin=None):
     )  # [_is_timestamp_column(df.columns)]
     timestamp_cols = timestamp_col[timestamp_col].index
 
-    # Check that only one timestamp column is found, in which case is a legitimate 
+    # Check that only one timestamp column is found, in which case is a legitimate
     # timestamped dataframe;
     if len(timestamp_cols) == 1:
         # In which case:
@@ -63,9 +63,9 @@ def _load_avi(filename):
 def _load_dlc_h5(file, t0=None):
     df = pd.read_hdf(file)
     # remove first level of columns multiindex:
-    df.columns = df.columns.droplevel(0)  
+    df.columns = df.columns.droplevel(0)
 
-    return df  
+    return df
 
 
 class LazyDataDict(UserDict):
@@ -73,9 +73,11 @@ class LazyDataDict(UserDict):
 
     # Dictionary defining loading functions for different file types:
     # TODO specify better eg h5 files
-    LOADERS_DICT = dict(csv=_load_csv, 
-                        # avi=_load_avi, 
-                        h5=_load_dlc_h5)
+    LOADERS_DICT = dict(
+        csv=_load_csv,
+        # avi=_load_avi,
+        h5=_load_dlc_h5,
+    )
 
     def __init__(self, path, timestamp_begin=None):
         self.root_path = Path(path)
@@ -103,20 +105,22 @@ class LazyDataDict(UserDict):
                 files_dict[name] = file
 
         return files_dict
-    
+
     def __repr__(self) -> str:
         output = ""
         line_template = "{:<25} {:<13} {:<13} {:<13}\n"
         output += line_template.format("Filename", "Extension", "Has reader", "Loaded")
         for filename, path in self.files_dict.items():
-            output += line_template.format(filename, 
-                                           path.suffix, 
-                                           ["No", "Yes"][int(path.suffix[1:] in self.LOADERS_DICT)],
-                                           ["No", "Yes"][int(filename in self.data)])
+            output += line_template.format(
+                filename,
+                path.suffix,
+                ["No", "Yes"][int(path.suffix[1:] in self.LOADERS_DICT)],
+                ["No", "Yes"][int(filename in self.data)],
+            )
 
         return output
         # return f"Lazy data dict with keys: {list(self.files_dict.keys())}"
-    
+
     def __str__(self) -> str:
         return self.__repr__()
 
