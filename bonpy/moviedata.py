@@ -1,14 +1,15 @@
 from abc import ABC, abstractmethod, abstractproperty
-from functools import cached_property
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
-import pandas as pd
 
 import cv2
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 
 from bonpy.time_utils import inplace_time_cols_fix
+
 
 @dataclass
 class MovieMetadata:
@@ -40,14 +41,16 @@ class MovieData(ABC):
 
     def __init__(self, source_filename, timestamp_begin=None) -> None:
         source_filename = Path(source_filename)
-        
+
         assert source_filename.exists()
 
         # Check if a timestamp file is present.
         # The convention is that timestamp file is named the same as the movie file,
         # with timestamp instead of movie and .csv extension
-        self.timestamp_filename = source_filename.parent / source_filename.name.replace("video", "timestamps")
-        
+        self.timestamp_filename = source_filename.parent / source_filename.name.replace(
+            "video", "timestamps"
+        )
+
         # Check if there is a DLC file available:
         # try:
         #     self.dlc_filename = next(source_filename.parent.glob(f"{source_filename.name}*DLC*.h5"))
@@ -69,11 +72,11 @@ class MovieData(ABC):
     @property
     def has_timestamps(self) -> bool:
         return self.timestamp_filename.exists()
-    
+
     @property
     def has_dlc(self) -> bool:
         return self.dlc_filename.exists()
-    
+
     @cached_property
     def timestamps(self) -> np.ndarray:
         if self.has_timestamps:

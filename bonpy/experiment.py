@@ -1,7 +1,7 @@
-from datetime import datetime
-from pathlib import Path
-from functools import cached_property
 import os
+from datetime import datetime
+from functools import cached_property
+from pathlib import Path
 
 import pandas as pd
 
@@ -27,7 +27,7 @@ class Experiment:
         )
 
     @cached_property
-    def size(self):
+    def size_gb(self):
         total_size = 0
         for file in self.root_path.rglob("*"):
             if file.is_file():

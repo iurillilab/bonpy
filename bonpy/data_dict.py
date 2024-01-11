@@ -1,28 +1,31 @@
 from collections import UserDict
 from pathlib import Path
-import pandas as pd
-import flammkuchen as fl
 
-from bonpy.time_utils import inplace_time_cols_fix
+import flammkuchen as fl
+import pandas as pd
 
 # from bonpy.df_parsers import parse_ball_log, parse_stim_log
 from bonpy.moviedata import OpenCVMovieData
+from bonpy.time_utils import inplace_time_cols_fix
 
 # FILETSTAMP_LENGTH = 19  # length of the file timestamp
 # FILETSTAMP_PARSER = "%Y-%m-%dT%H_%M_%S"  # pattern of the file timestamp
 # KEY_PATTERN = "log"  # pattern in the file that identify the key string
 
-# PARSERS_DICT = dict(
-#     ball_log=parse_ball_log,
-#     stim_log=parse_stim_log,
-#     laser_log=parse_stim_log,
-# )
-
-
 def _load_csv(filename, timestamp_begin=None):
     """Load a csv file and parse the timestamp column."""
     df = pd.read_csv(filename)
     inplace_time_cols_fix(df, timestamp_begin=timestamp_begin)
+    return df
+
+
+def _load_laser_log_csv(file, timestamp_begin=None):
+    df = _load_csv(file, timestamp_begin=None)
+    df.columns = ["LaserSerialMex", "timestamp"]
+    df.reset_index(drop=True, inplace=True)
+    for i, content in enumerate(["frequency", "pulse_width", "stim_duraiton"]):
+        df[content] = df["LaserSerialMex"].apply(lambda x: x.split(";")[i])
+
     return df
 
 
@@ -40,14 +43,18 @@ def _load_dlc_h5(file, timestamp_begin=None):
     df.columns = df.columns.droplevel(0)
 
     # Check if there are timestamps for the video:
-    candidate_timestamps_name = file.parent / (file.name.split("DLC")[0].replace("video", "timestamps") + ".csv")
+    candidate_timestamps_name = file.parent / (
+        file.name.split("DLC")[0].replace("video", "timestamps") + ".csv"
+    )
     print(candidate_timestamps_name)
     if candidate_timestamps_name.exists():
         print("here")
         timestamps_df = pd.read_csv(candidate_timestamps_name)
         inplace_time_cols_fix(timestamps_df, timestamp_begin=timestamp_begin)
-        assert timestamps_df.shape[0] == df.shape[0], "Timestamps and DLC dataframes have different lengths!"
-        
+        assert (
+            timestamps_df.shape[0] == df.shape[0]
+        ), "Timestamps and DLC dataframes have different lengths!"
+
         df["time"] = timestamps_df["time"]
 
     return df
@@ -58,12 +65,13 @@ class LazyDataDict(UserDict):
 
     # Dictionary defining loading functions for different file types.
     # By default only extention is used to identify the loader, but
-    # this can be changed by prepending name patterns to match with _ 
+    # this can be changed by prepending name patterns to match with _
     # (e.g. DLC_h5 matches all h5 files containing DLC in the name)
     # The order of this dictionary matter! Loaders will be tried in order top to bottom,
     # so if a file matches multiple loaders, the last one will be used.
     LOADERS_DICT = dict(
         csv=_load_csv,
+        laser_csv=_load_laser_log_csv,
         avi=_load_avi,
         h5=_load_h5,
         DLC_h5=_load_dlc_h5,
@@ -92,10 +100,9 @@ class LazyDataDict(UserDict):
             file_dict = dict(file=file, category="-")
             for category in categories_to_discover:
                 extension = category.split("_")[-1]
-                pattern = category.split('_')[0] if "_" in category else ""
+                pattern = category.split("_")[0] if "_" in category else ""
 
                 if file.suffix[1:] == extension and pattern in file.stem:
-
                     # split over beginning of timestamp, assuming convention _YYYY...
                     name = file.stem
                     if "_202" in file.stem:
@@ -113,7 +120,9 @@ class LazyDataDict(UserDict):
     def __repr__(self) -> str:
         output = ""
         line_template = "{:<25} {:<13} {:<13} {:<13} {:<13}\n"
-        output += line_template.format("Filename", "Extension", "Category", "Has reader", "Loaded")
+        output += line_template.format(
+            "Filename", "Extension", "Category", "Has reader", "Loaded"
+        )
         for filename, file_info in self.files_dict.items():
             path = file_info["file"]
             print(path)
@@ -139,3 +148,8 @@ class LazyDataDict(UserDict):
             self.data[key] = self.LOADERS_DICT[category](file, self.timestamp_begin)
 
         return self.data[key]
+
+
+if __name__ == "__main__":
+    df = _load_laser_log_csv("/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/laser-log_2023-12-14T16_27_20.csv")
+    print(df.head())

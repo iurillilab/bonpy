@@ -1,11 +1,14 @@
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 # fixture for the asset folder
 @pytest.fixture
 def asset_moviedata_folder():
-    return Path(__file__).parent / "assets" / "dataset" / "M1" / "20231201" / "095001"
+    return (
+        Path(__file__).parent / "assets" / "test_dataset" / "M1" / "20231214" / "162720"
+    )
 
 
 # fixture for the movie file

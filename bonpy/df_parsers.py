@@ -32,28 +32,3 @@ def parse_ball_log(file, t0=None, smooth_wnd=None):
 
     return df
 
-
-def parse_stim_log(file, t0=None):
-    df = pd.read_csv(file)
-    df.columns = ["laser", "timestamp"]
-    df.reset_index(drop=True, inplace=True)
-    inplace_time_cols_fix(df, t0=t0)
-    return df
-
-
-def parse_dlc_tracking(file, t0=None):
-    df = pd.read_hdf(file)
-    # remove first level of columns multiindex:
-    df.columns = df.columns.droplevel(0)
-
-    # Check if there are timestamps for the video:
-    candidate_timestamps_name = file.parent / file.name.split("DLC")[0].replace("video", "timestamps")
-
-    if candidate_timestamps_name.exists():
-        timestamps_df = pd.read_csv(candidate_timestamps_name)
-        inplace_time_cols_fix(timestamps_df)
-        assert timestamps_df.shape[0] == df.shape[0], "Timestamps and DLC dataframes have different lengths!"
-        
-        df["time"] = timestamps_df["time"]
-
-    return df

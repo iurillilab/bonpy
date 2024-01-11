@@ -1,16 +1,20 @@
-import time
-import pandas as pd
 from pathlib import Path
+import flammkuchen as fl
+
+import pandas as pd
+
 
 # Path to your DeepLabCut H5 file
 input_path = Path("/Users/vigji/Desktop/grid/M14/20231214/162720/")
-input_file = input_path / "eye-cam_video_2023-12-14T16_27_20DLC_resnet50_eye-pupilDec16shuffle1_15000.h5"
+input_file = (
+    input_path
+    / "eye-cam_video_2023-12-14T16_27_20DLC_resnet50_eye-pupilDec16shuffle1_15000.h5"
+)
 
-output_path = Path("/Users/vigji/code/bonpy/tests/assets/dataset/M1/20231201/095001")
+output_path = Path("/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720")
 output_file = output_path / input_file.name
 
-import flammkuchen as fl
-
+"""
 data = fl.load(input_file)
 print(data.keys())
 # Load the DataFrame from the H5 file
@@ -34,3 +38,16 @@ timestamp_df.iloc[:500].to_csv(output_file, index=False)
 
 # print header of new file:
 print(pd.read_csv(output_file).tail())
+"""
+
+ball_input_file = input_path / "ball-log_2023-12-14T16_27_20.csv"
+ball_df = pd.read_csv(ball_input_file)
+print(ball_df.tail())
+
+# save first 500 to new file:
+output_file = output_path / ball_input_file.name
+ball_df.iloc[:1000].to_csv(output_file, index=False)
+
+# print header of new file:
+print(pd.read_csv(output_file).tail())
+

@@ -1,7 +1,9 @@
 # Test classes in bonpy/moviedata.py using the asset folder as fixture:
-from numpy import dtype
-import pytest
 from pathlib import Path
+
+import pytest
+from numpy import dtype
+
 from bonpy.moviedata import OpenCVMovieData
 
 # from tests.conftest import asset_moviedata_file
@@ -28,7 +30,7 @@ def test_opencvmoviedata_metadata(asset_moviedata_file):
     assert mdata.metadata.width == 320
     assert mdata.metadata.height == 240
     assert mdata.metadata.dtype == dtype("uint8")
-    assert mdata.metadata.bw == True
+    assert mdata.metadata.bw
 
 
 @pytest.mark.parametrize(
