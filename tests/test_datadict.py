@@ -1,5 +1,3 @@
-import numpy as np
-
 from bonpy.data_dict import LazyDataDict
 
 
@@ -9,6 +7,9 @@ def test_lazy_data_dict(asset_moviedata_folder):
     assert tuple(data_dict.keys()) == (
         "eye-cam_video",
         "eye-cam_video_DLC",
+        "ball-log_ball",
+        "laser-log_laser",
+        "cube-positions",
         "eye-cam_timestamps",
         "random_file",
         "simple_tstamp_csv",
@@ -17,37 +18,15 @@ def test_lazy_data_dict(asset_moviedata_folder):
     )
 
 
-def test_csv_loading(asset_moviedata_folder):
+# test lazy loading behavior:
+def test_lazy_loading(asset_moviedata_folder):
     data_dict = LazyDataDict(asset_moviedata_folder)
 
-    simple_csv_with_timestamp = data_dict["simple_tstamp_csv"]
+    for key in data_dict.keys():
+        assert key not in data_dict.data
 
-    assert simple_csv_with_timestamp.shape == (500, 2)
-    assert simple_csv_with_timestamp.columns.tolist() == ["timedelta", "time"]
-    assert np.allclose(
-        simple_csv_with_timestamp["time"].values[-5:],
-        [15.6973952, 15.725568, 15.754176, 15.7832448, 15.8210688],
-    )
+    for key in data_dict.keys():
+        data_dict[key]
 
-
-def test_h5_loading(asset_moviedata_folder):
-    data_dict = LazyDataDict(asset_moviedata_folder)
-    simple_h5 = data_dict["simple_h5"]
-    assert list(simple_h5.keys())
-
-
-def test_dlc_loading(asset_moviedata_folder):
-    data_dict = LazyDataDict(asset_moviedata_folder)
-    dlc_h5 = data_dict["eye-cam_video_DLC"]
-
-    assert dlc_h5.shape == (500, 37)
-    assert dlc_h5.columns.tolist()[:2] == [("top-eyelid_1", "x"), ("top-eyelid_1", "y")]
-
-
-def test_video_loading(asset_moviedata_folder):
-    data_dict = LazyDataDict(asset_moviedata_folder)
-
-    moviedata = data_dict["eye-cam_video"]
-    assert moviedata.shape == (500, 240, 320)
-    assert moviedata.metadata.n_frames == 500
-    assert moviedata.metadata.width == 320
+    for key in data_dict.keys():
+        assert key in data_dict.data

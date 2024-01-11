@@ -149,8 +149,8 @@ class OpenCVMovieData(MovieData):
         10  # Absolute tolerance of similarity across channels for BW detection
     )
 
-    def __init__(self, source_filename, verbose=True) -> None:
-        super().__init__(source_filename)
+    def __init__(self, source_filename, timestamp_begin=None, verbose=True) -> None:
+        super().__init__(source_filename, timestamp_begin=timestamp_begin)
 
         self.verbose = verbose
 

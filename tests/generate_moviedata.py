@@ -11,7 +11,9 @@ input_file = (
     / "eye-cam_video_2023-12-14T16_27_20DLC_resnet50_eye-pupilDec16shuffle1_15000.h5"
 )
 
-output_path = Path("/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720")
+output_path = Path(
+    "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720"
+)
 output_file = output_path / input_file.name
 
 """
@@ -50,4 +52,3 @@ ball_df.iloc[:1000].to_csv(output_file, index=False)
 
 # print header of new file:
 print(pd.read_csv(output_file).tail())
-
