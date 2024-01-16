@@ -1,14 +1,9 @@
-import pandas as pd
-
-from bonpy.time_utils import inplace_time_cols_fix
-
 import flammkuchen as fl
 import pandas as pd
 
 # from bonpy.df_parsers import parse_ball_log, parse_stim_log
 from bonpy.moviedata import OpenCVMovieData
 from bonpy.time_utils import inplace_time_cols_fix
-
 
 BALL_SMOOOTH_WND = 200
 

@@ -1,7 +1,7 @@
 from collections import UserDict
 from pathlib import Path
-from bonpy.data_parsers import LOADERS_DICT
 
+from bonpy.data_parsers import LOADERS_DICT
 
 # FILETSTAMP_LENGTH = 19  # length of the file timestamp
 # FILETSTAMP_PARSER = "%Y-%m-%dT%H_%M_%S"  # pattern of the file timestamp
@@ -41,6 +41,10 @@ class LazyDataDict(UserDict):
     def _discover_files(path):
         categories_to_discover = LazyDataDict.loaders_dict.keys()
 
+        # split over beginning of timestamp, assuming convention _YYYY...
+        # as default in BonsaiRX
+        SPLIT_PATTERN = "_202"
+
         # Loop over all categories that have a parser defined.
         # For each, make a dictionary of dictionaries
         files_dict = dict()
@@ -52,11 +56,11 @@ class LazyDataDict(UserDict):
                 pattern = category.split("_")[0] if "_" in category else ""
 
                 if file.suffix[1:] == extension and pattern in file.stem:
-                    # split over beginning of timestamp, assuming convention _YYYY...
                     name = file.stem
-                    if "_202" in file.stem:
-                        name = name.split("_202")[0]
+                    if SPLIT_PATTERN in file.stem:
+                        name = name.split(SPLIT_PATTERN)[0]
 
+                    # If we omplement a specific loader, add to the name:
                     if "_" in category:
                         name = name + "_" + category.split("_")[0]
 

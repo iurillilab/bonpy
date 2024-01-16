@@ -1,8 +1,7 @@
 from pathlib import Path
+
 import flammkuchen as fl
-
 import pandas as pd
-
 
 # Path to your DeepLabCut H5 file
 input_path = Path("/Users/vigji/Desktop/grid/M14/20231214/162720/")

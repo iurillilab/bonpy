@@ -1,12 +1,13 @@
 import numpy as np
+
 from bonpy import data_dict
 from bonpy.data_parsers import (
     _load_avi,
+    _load_ball_log_csv,
     _load_csv,
+    _load_dlc_h5,
     _load_h5,
     _load_laser_log_csv,
-    _load_ball_log_csv,
-    _load_dlc_h5,
 )
 
 
