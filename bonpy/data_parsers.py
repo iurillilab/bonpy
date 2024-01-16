@@ -1,5 +1,7 @@
 import flammkuchen as fl
 import pandas as pd
+import numpy as np
+from pathlib import Path
 
 # from bonpy.df_parsers import parse_ball_log, parse_stim_log
 from bonpy.moviedata import OpenCVMovieData
@@ -51,6 +53,18 @@ def _load_ball_log_csv(file, timestamp_begin=None, smooth_wnd=None):
     return df
 
 
+def _load_cube_log_csv(file, timestamp_begin=None):
+    df = _load_csv(file, timestamp_begin=timestamp_begin)
+    # Keep only side trials:
+    df = df[df["Value.Theta"] != 3.1415]
+    df.rename(columns={"Value.Theta": "theta", 
+                            "Value.Radius": "radius",
+                            "Value.Direction": "direction",
+                            }, inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    return df
+
+
 def _load_avi(filename, timestamp_begin=None):
     return OpenCVMovieData(filename, timestamp_begin=timestamp_begin)
 
@@ -60,6 +74,8 @@ def _load_h5(filename, _=None):
 
 
 def _load_dlc_h5(file, timestamp_begin=None):
+    file = Path(file)
+
     df = pd.read_hdf(file)
     # remove first level of columns multiindex:
     df.columns = df.columns.droplevel(0)
@@ -68,9 +84,8 @@ def _load_dlc_h5(file, timestamp_begin=None):
     candidate_timestamps_name = file.parent / (
         file.name.split("DLC")[0].replace("video", "timestamps") + ".csv"
     )
-    print(candidate_timestamps_name)
+
     if candidate_timestamps_name.exists():
-        print("here")
         timestamps_df = pd.read_csv(candidate_timestamps_name)
         inplace_time_cols_fix(timestamps_df, timestamp_begin=timestamp_begin)
         assert (
@@ -82,6 +97,100 @@ def _load_dlc_h5(file, timestamp_begin=None):
     return df
 
 
+def _project_points_onto_line(points):
+    # Calculate the mean of x and y
+    mean_x = np.nanmean(points[:, 0])
+    mean_y = np.nanmean(points[:, 1])
+
+    # Calculate the slope of the line (principal component)
+    m = np.nansum((points[:, 0] - mean_x) * (points[:, 1] - mean_y)) / np.nansum((points[:, 0] - mean_x) ** 2)
+
+    # Calculate the intercept of the line
+    b = mean_y - m * mean_x
+    print(b, m)
+
+    # Project each point onto the line
+    projected_points = np.zeros_like(points)
+    for i, (x, y) in enumerate(points):
+        x_proj = (x + m * y - m * b) / (1 + m ** 2)
+        y_proj = (m * x + (m ** 2) * y - (m ** 2) * b) / (1 + m ** 2) + b
+        projected_points[i] = [x_proj, y_proj]
+    print(np.nansum(np.isnan(projected_points)))
+
+    return projected_points
+
+
+# The second level of the column multiindex contains x, y and likelyhood.
+# For each label (first level of the column multiindex), set x and y to np.nan if the likelyhood is below a threshold:
+def _remove_low_likelyhood(df, likelihood_threshold=0.95):
+    df_interp = df.copy()
+    # Get unique labels from the first level of the multiindex
+    labels = df.columns.get_level_values(0).unique()
+    for label in labels:
+        if label == "time":
+            continue
+        # Select columns for current label
+        # label_data = df_interp.loc[:, label]
+        # Check if the likelihood is below the threshold
+        low_likelihood = df_interp[(label, "likelihood")] < likelihood_threshold
+
+        # Set 'x' and 'y' to np.nan where likelihood is low
+        for coord in ['x', 'y']:
+            df_interp.loc[low_likelihood, (label, coord)]= np.nan
+        # label_data.loc[low_likelihood, 'x'] = np.nan
+        # label_data.loc[low_likelihood, 'y'] = np.nan
+
+    return df_interp.interpolate(method='linear', axis=0)
+
+
+def _compute_avg_bodypart_position(df, bodypart_name):
+    # In the dataframe there's a multilevel column index, with the first level being the body part name.
+    # Take all that have the first level of the column index being "eyelid":
+    all_bodypart_cols = df.columns[[bodypart_name in col for col in df.columns.get_level_values(0)]]
+
+    # Compute the average eyelid position by averaging over x and y coordinates, indicated in the second level of the column index:
+    bodypart_data = df[all_bodypart_cols]
+
+    # Compute the mean for each coordinate
+    # Assuming the second level of the column index has 'x' and 'y'
+    mean_df = dict()
+    for coord in ['x', 'y']:
+        mean_df[coord] = bodypart_data.xs(coord, level=1, axis=1).mean(axis=1)
+
+    return pd.DataFrame(mean_df)
+
+
+def _compute_mean_pupil_diameter(df):
+    all_pupil_diameters = []
+
+    for i in range(3):
+        diff = df[f"pupil_{i+1}"] - df[f"pupil_{i+2}"]
+        all_pupil_diameters.append(np.sqrt(diff.x**2 + diff.y**2))
+
+    return pd.concat(all_pupil_diameters, axis=1).mean(axis=1)
+
+
+def _load_pupil_dlc_h5(file, timestamp_begin=None):
+    df = _load_dlc_h5(file, timestamp_begin=timestamp_begin)
+
+    df = _remove_low_likelyhood(df)
+    avg_eyelid_abs = _compute_avg_bodypart_position(df, 'eyelid')
+    avg_pupil_abs = _compute_avg_bodypart_position(df, 'pupil')
+    avg_pupil_pos = avg_pupil_abs - avg_eyelid_abs
+    avg_pupil_diameter = _compute_mean_pupil_diameter(df)
+
+    eye_df = df # exp.data_dict["eye-cam_timestamps"]
+    eye_df["avg_pupil_diameter"] = avg_pupil_diameter
+    eye_df["avg_pupil_x"] = avg_pupil_pos.x
+    eye_df["avg_pupil_y"] = avg_pupil_pos.y
+    projections = _project_points_onto_line(eye_df[["avg_pupil_x", "avg_pupil_y"]].values)
+    eye_df["main_ax_proj"] = projections[:, 0]
+    eye_df["sec_ax_proj"] = projections[:, 1]
+
+    return eye_df
+
+
+
 # TODO: just changing this dictionary and the functions it implements could be a reasonable
 # way to versioning the data loading process; in the future new dictionaries could be defined
 # for new data compositions.
@@ -89,17 +198,81 @@ LOADERS_DICT = dict(
     csv=_load_csv,
     laser_csv=_load_laser_log_csv,
     ball_csv=_load_ball_log_csv,
+    cube_csv=_load_cube_log_csv,
     avi=_load_avi,
     h5=_load_h5,
     DLC_h5=_load_dlc_h5,
+    eye_DLC_h5=_load_pupil_dlc_h5,
 )
 
 if __name__ == "__main__":
     pass
+    #df = _load_cube_log_csv(
+    #    "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/cube-positions_2023-12-14T16_27_20.csv"
+    # )
+    # print (df.head())
+    # print (df.columns)
+    # print (df.shape)
+    # print("--------")
+
     df = _load_laser_log_csv(
-        "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/laser-log_2023-12-14T16_27_20.csv"
-     )
+        "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/laser-log_2023-12-14T16_27_20.csv")
+    
+    laser_log = df
+    #assert laser_log.shape == (144, 5)
+    #assert laser_log.columns.tolist() == ['LaserSerialMex', 'timedelta', 'time', 'frequency', 'pulse_width',
+    #   'stim_duration']
+
     print(df.head())
     print(df.columns)
     print(df.shape)
+
+    # df = _load_pupil_dlc_h5(
+    #     "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/eye-cam_video_2023-12-14T16_27_20DLC_resnet50_eye-pupilDec16shuffle1_15000.h5"
+    #  )
+    # cols = pd.MultiIndex.from_tuples([(      'top-eyelid_1',          'x'),
+    #         (      'top-eyelid_1',          'y'),
+    #         (      'top-eyelid_1', 'likelihood'),
+    #         (      'top-eyelid_2',          'x'),
+    #         (      'top-eyelid_2',          'y'),
+    #         (      'top-eyelid_2', 'likelihood'),
+    #         (      'top-eyelid_3',          'x'),
+    #         (      'top-eyelid_3',          'y'),
+    #         (      'top-eyelid_3', 'likelihood'),
+    #         (      'top-eyelid_4',          'x'),
+    #         (      'top-eyelid_4',          'y'),
+    #         (      'top-eyelid_4', 'likelihood'),
+    #         (   'bottom-eyelid_2',          'x'),
+    #         (   'bottom-eyelid_2',          'y'),
+    #         (   'bottom-eyelid_2', 'likelihood'),
+    #         (   'bottom-eyelid_1',          'x'),
+    #         (   'bottom-eyelid_1',          'y'),
+    #         (   'bottom-eyelid_1', 'likelihood'),
+    #         (           'pupil_1',          'x'),
+    #         (           'pupil_1',          'y'),
+    #         (           'pupil_1', 'likelihood'),
+    #         (           'pupil_2',          'x'),
+    #         (           'pupil_2',          'y'),
+    #         (           'pupil_2', 'likelihood'),
+    #         (           'pupil_3',          'x'),
+    #         (           'pupil_3',          'y'),
+    #         (           'pupil_3', 'likelihood'),
+    #         (           'pupil_4',          'x'),
+    #         (           'pupil_4',          'y'),
+    #         (           'pupil_4', 'likelihood'),
+    #         (           'pupil_5',          'x'),
+    #         (           'pupil_5',          'y'),
+    #         (           'pupil_5', 'likelihood'),
+    #         (           'pupil_6',          'x'),
+    #         (           'pupil_6',          'y'),
+    #         (           'pupil_6', 'likelihood'),
+    #         (              'time',           ''),
+    #         ('avg_pupil_diameter',           ''),
+    #         (       'avg_pupil_x',           ''),
+    #         (       'avg_pupil_y',           ''),
+    #         (      'main_ax_proj',           ''),
+    #         (       'sec_ax_proj',           '')],
+    #        names=['bodyparts', 'coords'])
+    # assert all(df.columns == cols)
+    # assert df.shape == (500, 42)
 
