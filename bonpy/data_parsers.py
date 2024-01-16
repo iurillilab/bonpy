@@ -19,7 +19,7 @@ def _load_laser_log_csv(file, timestamp_begin=None):
     df = _load_csv(file, timestamp_begin=timestamp_begin)
 
     df.reset_index(drop=True, inplace=True)
-    for i, content in enumerate(["frequency", "pulse_width", "stim_duraiton"]):
+    for i, content in enumerate(["frequency", "pulse_width", "stim_duration"]):
         df[content] = df["LaserSerialMex"].apply(lambda x: x.split(";")[i])
 
     return df
@@ -96,7 +96,10 @@ LOADERS_DICT = dict(
 
 if __name__ == "__main__":
     pass
-    # df = _load_ball_log_csv(
-    #    "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/ball-log_2023-12-14T16_27_20.csv"
-    # )
-    # print(df.head())
+    df = _load_laser_log_csv(
+        "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/laser-log_2023-12-14T16_27_20.csv"
+     )
+    print(df.head())
+    print(df.columns)
+    print(df.shape)
+

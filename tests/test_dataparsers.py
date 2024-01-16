@@ -1,6 +1,5 @@
 import numpy as np
 
-from bonpy import data_dict
 from bonpy.data_parsers import (
     _load_avi,
     _load_ball_log_csv,
@@ -46,3 +45,21 @@ def test_video_loading(asset_moviedata_folder):
     assert moviedata.shape == (500, 240, 320)
     assert moviedata.metadata.n_frames == 500
     assert moviedata.metadata.width == 320
+
+
+def test_ball_log_loading(asset_moviedata_folder):
+    ball_log = _load_ball_log_csv(
+        asset_moviedata_folder / "ball-log_2023-12-14T16_27_20.csv"
+    )
+    assert ball_log.shape == (1000, 6)
+    assert ball_log.columns.tolist() == ['x0', 'x1', 'y0', 'y1', 'timedelta', 'time']
+
+
+def test_laser_log_loading(asset_moviedata_folder):
+    laser_log = _load_laser_log_csv(
+        asset_moviedata_folder / "laser-log_2023-12-14T16_27_20.csv"
+    )
+    assert laser_log.shape == (144, 6)
+    assert laser_log.columns.tolist() == ['LaserSerialMex', 'timedelta', 'time', 'frequency', 'pulse_width',
+       'stim_duration']
+
