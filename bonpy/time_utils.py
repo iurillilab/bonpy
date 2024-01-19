@@ -42,3 +42,34 @@ def inplace_time_cols_fix_and_resample(df, timestamp_begin=None):
         df.drop([timestamp_col], axis=1, inplace=True)
 
 
+def interpolate_df(input_df, new_timebin="10ms", from_zero=True):
+    """Interpolate dataframe to new timebin, assuming there is a time column as 
+    per standard bonpy loading function.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe to interpolate, must have a time column
+    new_timebin : str, optional
+        New time, by default "10ms"
+    from_zero : bool, optional
+        Whether to start from zero the interpolated array, by default True
+
+    Returns
+    -------
+    pd.DataFrame
+        Interpolated dataframe
+    """
+    if from_zero:
+        # Add a first row with time 0 and all other columns np.nan
+        # Initialize empty dataframe with same columns as eye_df and fill with nans
+        pad_df = pd.DataFrame(np.full((1, input_df.shape[1]), np.nan), columns=input_df.columns)
+        pad_df["time"] = 0
+
+        input_df = pd.concat([pad_df, input_df], ignore_index=True)
+
+    time_col = pd.to_datetime(input_df["time"], unit="s")
+    resampled_df = input_df.set_index(time_col).resample(new_timebin).mean().interpolate()
+    resampled_df.reset_index(inplace=True, drop=True)
+    
+    return resampled_df
