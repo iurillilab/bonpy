@@ -13,7 +13,7 @@ def _is_timestamp_column(values):
     return all(re.match(timestamp_regex, str(x)) for x in values)
 
 
-def inplace_time_cols_fix(df, timestamp_begin=None):
+def inplace_time_cols_fix_and_resample(df, timestamp_begin=None):
     timestamp_col = df.head().apply(_is_timestamp_column)
     timestamp_cols = timestamp_col[timestamp_col].index
 
@@ -40,3 +40,5 @@ def inplace_time_cols_fix(df, timestamp_begin=None):
         df["time"] = df["timedelta"].dt.total_seconds()
 
         df.drop([timestamp_col], axis=1, inplace=True)
+
+

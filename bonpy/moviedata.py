@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from bonpy.time_utils import inplace_time_cols_fix
+from bonpy.time_utils import inplace_time_cols_fix_and_resample
 
 
 @dataclass
@@ -81,7 +81,7 @@ class MovieData(ABC):
     def timestamps(self) -> np.ndarray:
         if self.has_timestamps:
             timestamps_df = pd.read_csv(self.timestamp_filename)
-            inplace_time_cols_fix(timestamps_df, timestamp_begin=self.timestamp_begin)
+            inplace_time_cols_fix_and_resample(timestamps_df, timestamp_begin=self.timestamp_begin)
 
             return timestamps_df
         else:
