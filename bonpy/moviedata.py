@@ -81,7 +81,9 @@ class MovieData(ABC):
     def timestamps(self) -> np.ndarray:
         if self.has_timestamps:
             timestamps_df = pd.read_csv(self.timestamp_filename)
-            inplace_time_cols_fix_and_resample(timestamps_df, timestamp_begin=self.timestamp_begin)
+            inplace_time_cols_fix_and_resample(
+                timestamps_df, timestamp_begin=self.timestamp_begin
+            )
 
             return timestamps_df
         else:

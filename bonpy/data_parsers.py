@@ -91,7 +91,9 @@ def _load_dlc_h5(file, timestamp_begin=None):
 
     if candidate_timestamps_name.exists():
         timestamps_df = pd.read_csv(candidate_timestamps_name)
-        inplace_time_cols_fix_and_resample(timestamps_df, timestamp_begin=timestamp_begin)
+        inplace_time_cols_fix_and_resample(
+            timestamps_df, timestamp_begin=timestamp_begin
+        )
         assert (
             timestamps_df.shape[0] == df.shape[0]
         ), "Timestamps and DLC dataframes have different lengths!"

@@ -7,7 +7,7 @@ def crop_around_idxs(trace, idxs, window, out_of_range_fill=np.nan):
     idxs_mat[idxs_mat >= len(trace)] = -1  # set to negative for filling in next step
 
     cropped = trace[idxs_mat]
-        
+
     # if filling with eg nan, first convert to float:
     if cropped.dtype is not type(out_of_range_fill):
         cropped = cropped.astype(type(out_of_range_fill))
