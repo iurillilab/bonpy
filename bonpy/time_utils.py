@@ -1,3 +1,4 @@
+import numpy as np
 import re
 
 import pandas as pd
@@ -38,6 +39,7 @@ def inplace_time_cols_fix_and_resample(df, timestamp_begin=None):
 
         df["timedelta"] = df[timestamp_col] - time_offset
         df["time"] = df["timedelta"].dt.total_seconds()
+        df.set_index("time", inplace=True)
 
         df.drop([timestamp_col], axis=1, inplace=True)
 
@@ -64,16 +66,18 @@ def interpolate_df(input_df, new_timebin="10ms", from_zero=True):
         # Add a first row with time 0 and all other columns np.nan
         # Initialize empty dataframe with same columns as eye_df and fill with nans
         pad_df = pd.DataFrame(
-            np.full((1, input_df.shape[1]), np.nan), columns=input_df.columns
+            np.full((1, input_df.shape[1]), np.nan), columns=input_df.columns, index=[0]
         )
-        pad_df["time"] = 0
+        # pad_df.index = 0
 
-        input_df = pd.concat([pad_df, input_df], ignore_index=True)
+        input_df = pd.concat([pad_df, input_df])
 
-    time_col = pd.to_datetime(input_df["time"], unit="s")
+    time_col = pd.to_datetime(input_df.index, unit="s")
     resampled_df = (
         input_df.set_index(time_col).resample(new_timebin).mean().interpolate()
     )
-    resampled_df.reset_index(inplace=True, drop=True)
+    resampled_df.index = (
+        resampled_df.index.T - resampled_df.index.T.normalize()
+    ).total_seconds()
 
     return resampled_df

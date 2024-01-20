@@ -98,7 +98,7 @@ def _load_dlc_h5(file, timestamp_begin=None):
             timestamps_df.shape[0] == df.shape[0]
         ), "Timestamps and DLC dataframes have different lengths!"
 
-        df["time"] = timestamps_df["time"]
+        df.index = timestamps_df.index
 
     return df
 
@@ -135,8 +135,8 @@ def _remove_low_likelyhood(df, likelihood_threshold=0.95):
     # Get unique labels from the first level of the multiindex
     labels = df.columns.get_level_values(0).unique()
     for label in labels:
-        if label == "time":
-            continue
+        # if label == "time":
+        #     continue
         # Select columns for current label
         # label_data = df_interp.loc[:, label]
         # Check if the likelihood is below the threshold
