@@ -20,7 +20,7 @@ def _load_csv(filename, timestamp_begin=None):
 def _load_laser_log_csv(file, timestamp_begin=None):
     df = _load_csv(file, timestamp_begin=timestamp_begin)
 
-    df.reset_index(drop=True, inplace=True)
+    # df.reset_index(drop=True, inplace=True)
     for i, content in enumerate(["frequency", "pulse_width", "stim_duration"]):
         df[content] = df["LaserSerialMex"].apply(lambda x: x.split(";")[i])
 
@@ -54,19 +54,29 @@ def _load_ball_log_csv(file, timestamp_begin=None, smooth_wnd=None):
 
 
 def _load_cube_log_csv(file, timestamp_begin=None):
+    MIN_DURATION = 1
+
     df = _load_csv(file, timestamp_begin=timestamp_begin)
-    # Keep only side trials:
-    df = df[df["Value.Theta"] != 3.1415]
-    df.rename(
-        columns={
+    # Exclude initial centering of position:
+    df = df.iloc[1:]
+    COLUMN_OPTIONS_DICT = {
             "Value.Theta": "theta",
             "Value.Radius": "radius",
             "Value.Direction": "direction",
-        },
+            "Value.CircleRadius": "radius",
+        }
+    columns_renaming_dict = {k: val for k, val in COLUMN_OPTIONS_DICT.items() if k in df.columns}
+    df.rename(
+        columns=columns_renaming_dict,
         inplace=True,
     )
-    df.reset_index(drop=True, inplace=True)
-    return df
+    # Assumes one every two movements is a reset movement:
+    actual_movements_df = df.iloc[::2].copy()
+    hold_times = df.iloc[1::2].index - df.iloc[::2].index
+    actual_movements_df["hold_time"] = hold_times
+    actual_movements_df = actual_movements_df[actual_movements_df["hold_time"] > MIN_DURATION]
+    # df.reset_index(drop=True, inplace=True)
+    return actual_movements_df
 
 
 def _load_avi(filename, timestamp_begin=None):
@@ -115,7 +125,7 @@ def _project_points_onto_line(points):
 
     # Calculate the intercept of the line
     b = mean_y - m * mean_x
-    print(b, m)
+    # print(b, m)
 
     # Project each point onto the line
     projected_points = np.zeros_like(points)
@@ -123,7 +133,7 @@ def _project_points_onto_line(points):
         x_proj = (x + m * y - m * b) / (1 + m**2)
         y_proj = (m * x + (m**2) * y - (m**2) * b) / (1 + m**2) + b
         projected_points[i] = [x_proj, y_proj]
-    print(np.nansum(np.isnan(projected_points)))
+    # print(np.nansum(np.isnan(projected_points)))
 
     return projected_points
 
@@ -190,6 +200,7 @@ def _load_pupil_dlc_h5(file, timestamp_begin=None):
     avg_pupil_diameter = _compute_mean_pupil_diameter(df)
 
     eye_df = df  # exp.data_dict["eye-cam_timestamps"]
+    eye_df["pupil_likelihood"] = sum([eye_df[(f"pupil_{i+1}", "likelihood")] for i in range(6)]) / 6
     eye_df["avg_pupil_diameter"] = avg_pupil_diameter
     eye_df["avg_pupil_x"] = avg_pupil_pos.x
     eye_df["avg_pupil_y"] = avg_pupil_pos.y
@@ -200,6 +211,12 @@ def _load_pupil_dlc_h5(file, timestamp_begin=None):
     eye_df["sec_ax_proj"] = projections[:, 1]
 
     return eye_df
+
+def _load_top_dlc_h5(file, timestamp_begin=None):
+    df = _load_dlc_h5(file, timestamp_begin=timestamp_begin)
+    df["centered_nose"] = df[("nose", "x")] - (df[("nose-l", "x")] + df[("nose-r", "x")]) / 2
+
+    return df
 
 
 # TODO: just changing this dictionary and the functions it implements could be a reasonable
@@ -214,6 +231,7 @@ LOADERS_DICT = dict(
     h5=_load_h5,
     DLC_h5=_load_dlc_h5,
     eye_DLC_h5=_load_pupil_dlc_h5,
+    top_DLC_h5=_load_top_dlc_h5,
 )
 
 if __name__ == "__main__":

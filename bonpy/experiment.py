@@ -4,6 +4,7 @@ from functools import cached_property
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 from bonpy.custom_dc import ExperimentMetadata
 from bonpy.data_dict import LazyDataDict
@@ -18,6 +19,7 @@ class Experiment:
         # self._discover_files()
 
         self.data_dict = LazyDataDict(self.root_path, timestamp_begin=timestamp)
+        
 
         self.metadata = ExperimentMetadata(
             timestamp=timestamp,
@@ -33,6 +35,34 @@ class Experiment:
             if file.is_file():
                 total_size += os.path.getsize(file)
         return total_size / 1e9
+    
+    # TODO make this configurable
+    @cached_property
+    def trials_df(self):
+        # Window from trial start to look for laser happening:
+        LASER_PAD_WND_S = 2
+        # Merge cube and laser logs:
+        laser_df = self.data_dict["laser-log_laser"].copy()
+        cube_df = self.data_dict["cube-positions_cube"].copy()
+
+        trials_df = cube_df
+        stim_ranges = trials_df.index + trials_df["hold_time"]
+        has_laser = [len(laser_df.loc[idx-LASER_PAD_WND_S:val]) for idx, val in stim_ranges.items()]
+        trials_df["laser"] = np.array(has_laser, dtype=bool)
+
+        to_add_laser = ["frequency", "pulse_width", "laser_off_t", "laser_on_t"]
+        for k in to_add_laser:
+            trials_df[k] = np.nan
+
+        for laser_event_n, laser_idx in enumerate(laser_df.index):
+            trial_idx = trials_df.loc[trials_df["laser"], :].iloc[laser_event_n].name
+            for k in "frequency", "pulse_width":
+                trials_df.loc[trial_idx, k] = float(laser_df.loc[laser_idx, k])
+
+            trials_df.loc[trial_idx, "laser_on_t"] = laser_idx
+            trials_df.loc[trial_idx, "laser_off_t"] = laser_idx + int(laser_df.loc[laser_idx, "stim_duration"]) / 1000
+
+        return trials_df
 
     @classmethod
     def load_112023(cls, folder_path, exp_id=None):

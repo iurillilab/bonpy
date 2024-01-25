@@ -26,7 +26,7 @@ def inplace_time_cols_fix_and_resample(df, timestamp_begin=None):
         # In which case:
         # Parse timestamp column:
         timestamp_col = timestamp_cols[0]
-        print(f"Found timestamp column: {timestamp_col}")
+        # print(f"Found timestamp column: {timestamp_col}")
         df[timestamp_col] = pd.to_datetime(df[timestamp_col])
 
         # Compute time offset:
