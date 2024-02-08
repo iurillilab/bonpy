@@ -1,7 +1,8 @@
-import flammkuchen as fl
-import pandas as pd
-import numpy as np
 from pathlib import Path
+
+import flammkuchen as fl
+import numpy as np
+import pandas as pd
 
 # from bonpy.df_parsers import parse_ball_log, parse_stim_log
 from bonpy.moviedata import OpenCVMovieData
@@ -60,12 +61,14 @@ def _load_cube_log_csv(file, timestamp_begin=None):
     # Exclude initial centering of position:
     df = df.iloc[1:]
     COLUMN_OPTIONS_DICT = {
-            "Value.Theta": "theta",
-            "Value.Radius": "radius",
-            "Value.Direction": "direction",
-            "Value.CircleRadius": "radius",
-        }
-    columns_renaming_dict = {k: val for k, val in COLUMN_OPTIONS_DICT.items() if k in df.columns}
+        "Value.Theta": "theta",
+        "Value.Radius": "radius",
+        "Value.Direction": "direction",
+        "Value.CircleRadius": "radius",
+    }
+    columns_renaming_dict = {
+        k: val for k, val in COLUMN_OPTIONS_DICT.items() if k in df.columns
+    }
     df.rename(
         columns=columns_renaming_dict,
         inplace=True,
@@ -74,7 +77,9 @@ def _load_cube_log_csv(file, timestamp_begin=None):
     actual_movements_df = df.iloc[::2].copy()
     hold_times = df.iloc[1::2].index - df.iloc[::2].index
     actual_movements_df["hold_time"] = hold_times
-    actual_movements_df = actual_movements_df[actual_movements_df["hold_time"] > MIN_DURATION]
+    actual_movements_df = actual_movements_df[
+        actual_movements_df["hold_time"] > MIN_DURATION
+    ]
     # df.reset_index(drop=True, inplace=True)
     return actual_movements_df
 
@@ -87,10 +92,36 @@ def _load_h5(filename, _=None):
     return fl.load(filename)
 
 
-def _load_dlc_h5(file, timestamp_begin=None):
+def load_dlc_h5(file, timestamp_begin=None):
     file = Path(file)
 
     df = pd.read_hdf(file)
+    # remove first level of columns multiindex:
+    df.columns = df.columns.droplevel(0)
+
+    # Check if there are timestamps for the video:
+    candidate_timestamps_name = file.parent / (
+        file.name.split("DLC")[0].replace("video", "timestamps") + ".csv"
+    )
+
+    if candidate_timestamps_name.exists():
+        timestamps_df = pd.read_csv(candidate_timestamps_name)
+        inplace_time_cols_fix_and_resample(
+            timestamps_df, timestamp_begin=timestamp_begin
+        )
+        assert (
+            timestamps_df.shape[0] == df.shape[0]
+        ), "Timestamps and DLC dataframes have different lengths!"
+
+        df.index = timestamps_df.index
+
+    return df
+
+
+def load_dlc_csv(file, timestamp_begin=None):
+    file = Path(file)
+
+    df = pd.read_csv(file)
     # remove first level of columns multiindex:
     df.columns = df.columns.droplevel(0)
 
@@ -191,7 +222,7 @@ def _compute_mean_pupil_diameter(df):
 
 
 def _load_pupil_dlc_h5(file, timestamp_begin=None):
-    df = _load_dlc_h5(file, timestamp_begin=timestamp_begin)
+    df = load_dlc_h5(file, timestamp_begin=timestamp_begin)
 
     df = _remove_low_likelyhood(df)
     avg_eyelid_abs = _compute_avg_bodypart_position(df, "eyelid")
@@ -200,7 +231,9 @@ def _load_pupil_dlc_h5(file, timestamp_begin=None):
     avg_pupil_diameter = _compute_mean_pupil_diameter(df)
 
     eye_df = df  # exp.data_dict["eye-cam_timestamps"]
-    eye_df["pupil_likelihood"] = sum([eye_df[(f"pupil_{i+1}", "likelihood")] for i in range(6)]) / 6
+    eye_df["pupil_likelihood"] = (
+        sum([eye_df[(f"pupil_{i+1}", "likelihood")] for i in range(6)]) / 6
+    )
     eye_df["avg_pupil_diameter"] = avg_pupil_diameter
     eye_df["avg_pupil_x"] = avg_pupil_pos.x
     eye_df["avg_pupil_y"] = avg_pupil_pos.y
@@ -212,9 +245,12 @@ def _load_pupil_dlc_h5(file, timestamp_begin=None):
 
     return eye_df
 
+
 def _load_top_dlc_h5(file, timestamp_begin=None):
-    df = _load_dlc_h5(file, timestamp_begin=timestamp_begin)
-    df["centered_nose"] = df[("nose", "x")] - (df[("nose-l", "x")] + df[("nose-r", "x")]) / 2
+    df = load_dlc_h5(file, timestamp_begin=timestamp_begin)
+    df["centered_nose"] = (
+        df[("nose", "x")] - (df[("nose-l", "x")] + df[("nose-r", "x")]) / 2
+    )
 
     return df
 
@@ -229,7 +265,7 @@ LOADERS_DICT = dict(
     cube_csv=_load_cube_log_csv,
     avi=_load_avi,
     h5=_load_h5,
-    DLC_h5=_load_dlc_h5,
+    DLC_h5=load_dlc_h5,
     eye_DLC_h5=_load_pupil_dlc_h5,
     top_DLC_h5=_load_top_dlc_h5,
 )
@@ -237,7 +273,7 @@ LOADERS_DICT = dict(
 if __name__ == "__main__":
     pass
     # df = _load_cube_log_csv(
-    #    "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/cube-positions_2023-12-14T16_27_20.csv"
+    #    "/Users/vigj`i/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/cube-positions_2023-12-14T16_27_20.csv"
     # )
     # print (df.head())
     # print (df.columns)

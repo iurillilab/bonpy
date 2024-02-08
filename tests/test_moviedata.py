@@ -20,6 +20,10 @@ def test_opencvmoviedata_open(asset_moviedata_file, string_arg):
     mdata = OpenCVMovieData(asset_moviedata_file)
     assert mdata is not None
 
+    assert mdata.shape == (500, 240, 320)
+    assert mdata.ndim == 3
+    assert mdata.dtype == dtype("uint8")
+
 
 def test_opencvmoviedata_metadata(asset_moviedata_file):
     """Test if OpenCVMovieData opens a file."""
@@ -39,7 +43,6 @@ def test_opencvmoviedata_metadata(asset_moviedata_file):
         (1, (240, 320)),
         ([1], (1, 240, 320)),
         ([1, 2, 3], (3, 240, 320)),
-        # (([1,2,3], 0, slice(0, 10)), (3, 1, 10)),
         (([1, 2, 3], slice(0, 10), slice(5, 10)), (3, 10, 5)),
         (([1, 2, 3], slice(0, -10), slice(5, 10)), (3, 230, 5)),
     ],

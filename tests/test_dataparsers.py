@@ -6,10 +6,10 @@ from bonpy.data_parsers import (
     _load_ball_log_csv,
     _load_csv,
     _load_cube_log_csv,
-    _load_dlc_h5,
     _load_h5,
     _load_laser_log_csv,
     _load_pupil_dlc_h5,
+    load_dlc_h5,
 )
 
 
@@ -32,7 +32,7 @@ def test_h5_loading(asset_moviedata_folder):
 
 
 def test_dlc_loading(asset_moviedata_folder):
-    dlc_h5 = _load_dlc_h5(
+    dlc_h5 = load_dlc_h5(
         asset_moviedata_folder
         / "eye-cam_video_2023-12-14T16_27_20DLC_resnet50_eye-pupilDec16shuffle1_15000.h5"
     )
@@ -62,12 +62,14 @@ def test_cube_log_loading(asset_moviedata_folder):
     cube_log = _load_cube_log_csv(
         asset_moviedata_folder / "cube-positions_2023-12-14T16_27_20.csv"
     )
-    assert cube_log.shape == (144, 4)
+    assert cube_log.shape == (144, 5)
+    print(cube_log.columns)
     assert cube_log.columns.tolist() == [
         "radius",
         "theta",
         "direction",
         "timedelta",
+        "hold_time",
     ]
 
 
@@ -90,7 +92,8 @@ def test_pupil_dlc_loading(asset_moviedata_folder):
         asset_moviedata_folder
         / "eye-cam_video_2023-12-14T16_27_20DLC_resnet50_eye-pupilDec16shuffle1_15000.h5"
     )
-    assert pupil_dlc.shape == (500, 41)
+    assert pupil_dlc.shape == (500, 42)
+
     cols = pd.MultiIndex.from_tuples(
         [
             ("top-eyelid_1", "x"),
@@ -129,6 +132,7 @@ def test_pupil_dlc_loading(asset_moviedata_folder):
             ("pupil_6", "x"),
             ("pupil_6", "y"),
             ("pupil_6", "likelihood"),
+            ("pupil_likelihood", ""),
             ("avg_pupil_diameter", ""),
             ("avg_pupil_x", ""),
             ("avg_pupil_y", ""),

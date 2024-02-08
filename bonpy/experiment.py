@@ -3,8 +3,8 @@ from datetime import datetime
 from functools import cached_property
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from bonpy.custom_dc import ExperimentMetadata
 from bonpy.data_dict import LazyDataDict
@@ -19,7 +19,6 @@ class Experiment:
         # self._discover_files()
 
         self.data_dict = LazyDataDict(self.root_path, timestamp_begin=timestamp)
-        
 
         self.metadata = ExperimentMetadata(
             timestamp=timestamp,
@@ -35,7 +34,7 @@ class Experiment:
             if file.is_file():
                 total_size += os.path.getsize(file)
         return total_size / 1e9
-    
+
     # TODO make this configurable
     @cached_property
     def trials_df(self):
@@ -47,7 +46,10 @@ class Experiment:
 
         trials_df = cube_df
         stim_ranges = trials_df.index + trials_df["hold_time"]
-        has_laser = [len(laser_df.loc[idx-LASER_PAD_WND_S:val]) for idx, val in stim_ranges.items()]
+        has_laser = [
+            len(laser_df.loc[idx - LASER_PAD_WND_S : val])
+            for idx, val in stim_ranges.items()
+        ]
         trials_df["laser"] = np.array(has_laser, dtype=bool)
 
         to_add_laser = ["frequency", "pulse_width", "laser_off_t", "laser_on_t"]
@@ -60,7 +62,9 @@ class Experiment:
                 trials_df.loc[trial_idx, k] = float(laser_df.loc[laser_idx, k])
 
             trials_df.loc[trial_idx, "laser_on_t"] = laser_idx
-            trials_df.loc[trial_idx, "laser_off_t"] = laser_idx + int(laser_df.loc[laser_idx, "stim_duration"]) / 1000
+            trials_df.loc[trial_idx, "laser_off_t"] = (
+                laser_idx + int(laser_df.loc[laser_idx, "stim_duration"]) / 1000
+            )
 
         return trials_df
 

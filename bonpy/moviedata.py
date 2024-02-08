@@ -94,7 +94,7 @@ class MovieData(ABC):
         return self.metadata.dtype
 
     @property
-    def n_dims(self) -> int:
+    def ndim(self) -> int:
         return len(self.shape)
 
     @property

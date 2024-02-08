@@ -1,7 +1,8 @@
-import pytest
-from bonpy.crop_utils import crop_around_idxs, smart_crop
 import numpy as np
 import pandas as pd
+import pytest
+
+from bonpy.crop_utils import crop_around_idxs, smart_crop
 
 
 @pytest.mark.parametrize("filling", [np.nan, -1])
@@ -88,18 +89,25 @@ def test_time_crop_df_drop(out_of_range_drop, res_shape):
 
 
 def test_pandas_2d_data():
-    test_2d_df = pd.DataFrame(data=np.arange(len(x_arr)*2).reshape(-1, len_2nd_dim), columns = columns, index=x_arr)
+    test_2d_df = pd.DataFrame(
+        data=np.arange(len(x_arr) * 2).reshape(-1, len_2nd_dim),
+        columns=columns,
+        index=x_arr,
+    )
 
-    timebase, cropped_data = smart_crop(test_2d_df, crop_events=crop_events, window=window)
+    timebase, cropped_data = smart_crop(
+        test_2d_df, crop_events=crop_events, window=window
+    )
     assert set(cropped_data.keys()) == set(columns)
     assert cropped_data[columns[0]].shape == (len(timebase), len(crop_events))
-    
+
 
 def test_numpy_2d_data():
+    test_2d_arr = np.arange(len(x_arr) * 2).reshape(-1, len_2nd_dim)
 
-    test_2d_arr = np.arange(len(x_arr)*2).reshape(-1, len_2nd_dim)
-
-    timebase, cropped_data = smart_crop(test_2d_arr, crop_events=crop_events, window=window, dt=dt)
+    timebase, cropped_data = smart_crop(
+        test_2d_arr, crop_events=crop_events, window=window, dt=dt
+    )
     assert cropped_data.shape == (len(timebase), len(crop_events), len_2nd_dim)
 
 
@@ -125,36 +133,39 @@ def test_assertion_errors():
     assert "Only one" in str(e.value)
 
 
-
-@pytest.mark.parametrize("timeargs", 
-                         (dict(dt=dt), dict(time_arr=x_arr)))
+@pytest.mark.parametrize("timeargs", (dict(dt=dt), dict(time_arr=x_arr)))
 def test_time_arr_options(timeargs):
-    test_2d_arr = np.arange(len(x_arr)*2).reshape(-1, len_2nd_dim)
+    test_2d_arr = np.arange(len(x_arr) * 2).reshape(-1, len_2nd_dim)
 
-    timebase, _ = smart_crop(test_2d_arr, crop_events=crop_events, window=window, **timeargs)
+    timebase, _ = smart_crop(
+        test_2d_arr, crop_events=crop_events, window=window, **timeargs
+    )
     assert np.allclose(timebase, np.arange(*window, dt))
 
 
 def test_jitter_issues():
     np.random.seed(42)
-    test_df = pd.DataFrame(data=np.arange(len(x_arr)), 
-                           columns=columns[:1], index=x_arr + np.random.rand(len(x_arr))*dt/2)
+    test_df = pd.DataFrame(
+        data=np.arange(len(x_arr)),
+        columns=columns[:1],
+        index=x_arr + np.random.rand(len(x_arr)) * dt / 2,
+    )
 
     # Passing with very high jitter threshold:
     smart_crop(
-                test_df,
-                crop_events=crop_events,
-                window=window,
-                max_jitter_fraction=0.5,
-            )
-    
+        test_df,
+        crop_events=crop_events,
+        window=window,
+        max_jitter_fraction=0.5,
+    )
+
     # Failing with low jitter threshold:
     with pytest.raises(ValueError) as e:
         smart_crop(
-                test_df,
-                crop_events=crop_events,
-                window=window,
-                max_jitter_fraction=0.001,
-            )
-    
+            test_df,
+            crop_events=crop_events,
+            window=window,
+            max_jitter_fraction=0.001,
+        )
+
     assert "jitter" in str(e.value)

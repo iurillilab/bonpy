@@ -1,7 +1,8 @@
-import pandas as pd
 import numpy as np
-from bonpy.time_utils import interpolate_df
+import pandas as pd
 import pytest
+
+from bonpy.time_utils import interpolate_df
 
 
 @pytest.mark.parametrize(
