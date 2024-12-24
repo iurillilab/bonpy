@@ -7,7 +7,7 @@ import pytest
 @pytest.fixture
 def asset_moviedata_folder():
     return (
-        Path(__file__).parent / "assets" / "test_dataset" / "M1" / "20231214" / "162720"
+        Path(__file__).parent / "assets" / "test_dataset" / "M13" / "20231214" / "162720"
     )
 
 

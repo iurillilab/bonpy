@@ -1,7 +1,10 @@
 from collections import UserDict
 from pathlib import Path
+from tkinter import N
 
-from bonpy.data_parsers import LOADERS_DICT
+from matplotlib.dates import MO
+
+from bonpy.data_parsers import LOADER_DICT, MOUSE_LOADER_DICT
 
 # FILETSTAMP_LENGTH = 19  # length of the file timestamp
 # FILETSTAMP_PARSER = "%Y-%m-%dT%H_%M_%S"  # pattern of the file timestamp
@@ -21,14 +24,16 @@ class LazyDataDict(UserDict):
     # TODO: just changing this dictionary and the functions it implements could be a reasonable
     # way to versioning the data loading process; in the future new dictionaries could be defined
     # for new data compositions.
-    loaders_dict = LOADERS_DICT
+    mouse_loaders_dict = MOUSE_LOADER_DICT
 
-    # Unknown file types will be loaded with this function:
-    loaders_dict.update({"-": lambda x, _: None})
-
-    def __init__(self, path, timestamp_begin=None):
+    def __init__(self, path, timestamp_begin=None, mouse_id=None):
         self.root_path = Path(path)
-        self.files_dict = self._discover_files(self.root_path)
+        if mouse_id is None:
+            mouse_id = self.root_path.parent.parent.name
+        self.loader_dict = self.mouse_loaders_dict[mouse_id]
+        self.loader_dict.update({"-": lambda x, _: None})
+
+        self.files_dict = self._discover_files(self.root_path, mouse_id=mouse_id)
 
         self.timestamp_begin = timestamp_begin
 
@@ -37,9 +42,11 @@ class LazyDataDict(UserDict):
     def keys(self):
         return self.files_dict.keys()
 
-    @staticmethod
-    def _discover_files(path):
-        categories_to_discover = LazyDataDict.loaders_dict.keys()
+    # @staticmethod
+    def _discover_files(self, path, mouse_id):
+        # loader_dict = LazyDataDict.mouse_loaders_dict[mouse_id]
+            # Unknown file types will be loaded with this function:
+        categories_to_discover = self.loader_dict.keys()
 
         # split over beginning of timestamp, assuming convention _YYYY...
         # as default in BonsaiRX
@@ -50,6 +57,7 @@ class LazyDataDict(UserDict):
         files_dict = dict()
         for file in path.glob("*"):
             name = file.stem
+            name.replace("__", "_")  # fix for double underscores in filenames
             file_dict = dict(file=file, category="-")
             for category in categories_to_discover:
                 extension = category.split("_")[-1]
@@ -101,19 +109,15 @@ class LazyDataDict(UserDict):
         file = self.files_dict[key]["file"]
         category = self.files_dict[key]["category"]
         if key not in self.data:
-            self.data[key] = self.loaders_dict[category](file, self.timestamp_begin)
+            self.data[key] = self.loader_dict[category](file, self.timestamp_begin)
 
         return self.data[key]
 
 
 if __name__ == "__main__":
-    # df = _load_ball_log_csv(
-    #    "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/ball-log_2023-12-14T16_27_20.csv"
-    # )
-    # print(df.head())
 
     data_dict = LazyDataDict(
-        "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720"
+        "/Users/vigji/Desktop/test_mpa_dir/M21/20240421/165242"
     )
     for key in data_dict.keys():
         print(key)

@@ -42,7 +42,7 @@ class MovieData(ABC):
     def __init__(self, source_filename, timestamp_begin=None) -> None:
         source_filename = Path(source_filename)
 
-        assert source_filename.exists()
+        assert source_filename.exists(), f"File {source_filename} does not exist."
 
         # Check if a timestamp file is present.
         # The convention is that timestamp file is named the same as the movie file,

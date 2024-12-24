@@ -1,4 +1,5 @@
 from pathlib import Path
+from re import M
 
 import flammkuchen as fl
 import numpy as np
@@ -24,6 +25,15 @@ def _load_laser_log_csv(file, timestamp_begin=None):
     # df.reset_index(drop=True, inplace=True)
     for i, content in enumerate(["frequency", "pulse_width", "stim_duration"]):
         df[content] = df["LaserSerialMex"].apply(lambda x: x.split(";")[i])
+
+    return df
+
+def _load_laser_log_v01_csv(file, timestamp_begin=None):
+    df = _load_csv(file, timestamp_begin=timestamp_begin)
+
+    # df.reset_index(drop=True, inplace=True)
+    for i, content in enumerate(["frequency", "pulse_width", "stim_duration"]):
+        df[content] = df["Value"].apply(lambda x: x.split(";")[i])
 
     return df
 
@@ -258,86 +268,44 @@ def _load_top_dlc_h5(file, timestamp_begin=None):
 # TODO: just changing this dictionary and the functions it implements could be a reasonable
 # way to versioning the data loading process; in the future new dictionaries could be defined
 # for new data compositions.
-LOADERS_DICT = dict(
-    csv=_load_csv,
-    laser_csv=_load_laser_log_csv,
-    ball_csv=_load_ball_log_csv,
-    cube_csv=_load_cube_log_csv,
-    avi=_load_avi,
-    h5=_load_h5,
-    DLC_h5=load_dlc_h5,
-    eye_DLC_h5=_load_pupil_dlc_h5,
-    top_DLC_h5=_load_top_dlc_h5,
-)
+LOADER_DICT = dict(
+    v00=dict(
+        csv=_load_csv,
+        laser_csv=_load_laser_log_csv,
+        ball_csv=_load_ball_log_csv,
+        cube_csv=_load_cube_log_csv,
+        avi=_load_avi,
+        h5=_load_h5,
+        DLC_h5=load_dlc_h5,
+        eye_DLC_h5=_load_pupil_dlc_h5,
+        top_DLC_h5=_load_top_dlc_h5,
+    ),
+    v01=dict(
+        csv=_load_csv,
+        laser_csv=_load_laser_log_v01_csv,
+        ball_csv=_load_ball_log_csv,
+        motor_csv=_load_cube_log_csv,
+        avi=_load_avi,
+        h5=_load_h5,
+        DLC_h5=load_dlc_h5,
+        eye_DLC_h5=_load_pupil_dlc_h5,
+        top_DLC_h5=_load_top_dlc_h5,
+    ))
+
+MOUSE_LOADER_DICT = dict(M13=LOADER_DICT["v00"], 
+                         M14=LOADER_DICT["v00"],
+                         M15=LOADER_DICT["v00"], 
+                         M16=LOADER_DICT["v00"],
+                         M17=LOADER_DICT["v00"], 
+                         M18=LOADER_DICT["v00"],
+                         M19=LOADER_DICT["v00"], 
+                         M20=LOADER_DICT["v00"],
+                         M21=LOADER_DICT["v01"], 
+                         M22=LOADER_DICT["v01"],
+                         M23=LOADER_DICT["v01"], 
+                         M24=LOADER_DICT["v01"])
 
 if __name__ == "__main__":
-    pass
-    # df = _load_cube_log_csv(
-    #    "/Users/vigj`i/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/cube-positions_2023-12-14T16_27_20.csv"
-    # )
-    # print (df.head())
-    # print (df.columns)
-    # print (df.shape)
-    # print("--------")
-
     df = _load_laser_log_csv(
-        "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/laser-log_2023-12-14T16_27_20.csv"
+        "/Users/vigji/Desktop/test_mpa_dir/M21/20240421/165242"
     )
-
-    laser_log = df
-    # assert laser_log.shape == (144, 5)
-    # assert laser_log.columns.tolist() == ['LaserSerialMex', 'timedelta', 'time', 'frequency', 'pulse_width',
-    #   'stim_duration']
-
-    print(df.head())
-    print(df.columns)
-    print(df.shape)
-
-    # df = _load_pupil_dlc_h5(
-    #     "/Users/vigji/code/bonpy/tests/assets/test_dataset/M1/20231214/162720/eye-cam_video_2023-12-14T16_27_20DLC_resnet50_eye-pupilDec16shuffle1_15000.h5"
-    #  )
-    # cols = pd.MultiIndex.from_tuples([(      'top-eyelid_1',          'x'),
-    #         (      'top-eyelid_1',          'y'),
-    #         (      'top-eyelid_1', 'likelihood'),
-    #         (      'top-eyelid_2',          'x'),
-    #         (      'top-eyelid_2',          'y'),
-    #         (      'top-eyelid_2', 'likelihood'),
-    #         (      'top-eyelid_3',          'x'),
-    #         (      'top-eyelid_3',          'y'),
-    #         (      'top-eyelid_3', 'likelihood'),
-    #         (      'top-eyelid_4',          'x'),
-    #         (      'top-eyelid_4',          'y'),
-    #         (      'top-eyelid_4', 'likelihood'),
-    #         (   'bottom-eyelid_2',          'x'),
-    #         (   'bottom-eyelid_2',          'y'),
-    #         (   'bottom-eyelid_2', 'likelihood'),
-    #         (   'bottom-eyelid_1',          'x'),
-    #         (   'bottom-eyelid_1',          'y'),
-    #         (   'bottom-eyelid_1', 'likelihood'),
-    #         (           'pupil_1',          'x'),
-    #         (           'pupil_1',          'y'),
-    #         (           'pupil_1', 'likelihood'),
-    #         (           'pupil_2',          'x'),
-    #         (           'pupil_2',          'y'),
-    #         (           'pupil_2', 'likelihood'),
-    #         (           'pupil_3',          'x'),
-    #         (           'pupil_3',          'y'),
-    #         (           'pupil_3', 'likelihood'),
-    #         (           'pupil_4',          'x'),
-    #         (           'pupil_4',          'y'),
-    #         (           'pupil_4', 'likelihood'),
-    #         (           'pupil_5',          'x'),
-    #         (           'pupil_5',          'y'),
-    #         (           'pupil_5', 'likelihood'),
-    #         (           'pupil_6',          'x'),
-    #         (           'pupil_6',          'y'),
-    #         (           'pupil_6', 'likelihood'),
-    #         (              'time',           ''),
-    #         ('avg_pupil_diameter',           ''),
-    #         (       'avg_pupil_x',           ''),
-    #         (       'avg_pupil_y',           ''),
-    #         (      'main_ax_proj',           ''),
-    #         (       'sec_ax_proj',           '')],
-    #        names=['bodyparts', 'coords'])
-    # assert all(df.columns == cols)
-    # assert df.shape == (500, 42)
